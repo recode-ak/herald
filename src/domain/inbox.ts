@@ -1,8 +1,11 @@
 import type { PersonId } from './access.ts';
 import { DomainError } from './errors.ts';
 
-/** `answer` — ответ на вопрос, `late-answer` — ответ на уже решённый вопрос, `directive` — указание человека. */
-export type InboxKind = 'answer' | 'late-answer' | 'directive';
+/**
+ * `answer` — ответ на вопрос, `late-answer` — ответ на уже решённый вопрос, `directive` — указание человека,
+ * `command` — команда терминала агента (`/clear`, `/compact`): её выполняет не агент, а его окружение (канал, расширение).
+ */
+export type InboxKind = 'answer' | 'late-answer' | 'directive' | 'command';
 
 export interface InboxDraft {
   id: string;
@@ -23,10 +26,19 @@ export interface InboxItemState extends InboxDraft {
 export class InboxItem {
   private constructor(private readonly state: InboxItemState) {}
 
+  /** Команды терминала, которые человек может отдать сессии. */
+  static readonly COMMANDS: readonly string[] = ['/clear', '/compact'];
+
+  static isCommand(text: string): boolean {
+    return InboxItem.COMMANDS.includes(text);
+  }
+
   static create(draft: InboxDraft, now: number): InboxItem {
     const text = draft.text.trim();
     if (!text) throw new DomainError('текст входящего пуст');
-    if (draft.kind !== 'directive' && !draft.questionId) throw new DomainError(`${draft.kind} без id вопроса`);
+    const needsQuestion = draft.kind === 'answer' || draft.kind === 'late-answer';
+    if (needsQuestion && !draft.questionId) throw new DomainError(`${draft.kind} без id вопроса`);
+    if (draft.kind === 'command' && !InboxItem.isCommand(text)) throw new DomainError(`нет команды ${text}`);
     return new InboxItem({ ...draft, text, createdAt: now });
   }
 

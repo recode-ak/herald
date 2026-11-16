@@ -33,7 +33,7 @@ function setup(maxWaitMs = 40) {
     ids: new SeqIds(),
     waiter: new Waiter(clock),
   };
-  const human = new HumanService({ ...deps, activeWindowMs: 86_400_000 });
+  const human = new HumanService(deps);
   const calls: string[] = [];
   const api = new HttpApi({ agent: new AgentService(deps), access: deps.access, maxWaitMs });
   const server = Bun.serve({

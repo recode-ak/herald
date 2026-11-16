@@ -20,6 +20,15 @@ describe('InboxItem', () => {
     expect(() => InboxItem.create({ ...base, id: 'i2', kind: 'late-answer', text: 'B' }, t0)).toThrow(DomainError);
   });
 
+  test('команда терминала — только из списка: /clear, /compact', () => {
+    const item = InboxItem.create({ ...base, id: 'i1', kind: 'command', text: '/compact' }, t0);
+    expect(item.kind).toBe('command');
+    expect(InboxItem.COMMANDS).toEqual(['/clear', '/compact']);
+    expect(InboxItem.isCommand('/clear')).toBe(true);
+    expect(InboxItem.isCommand('/rm')).toBe(false);
+    expect(() => InboxItem.create({ ...base, id: 'i2', kind: 'command', text: '/rm -rf' }, t0)).toThrow(DomainError);
+  });
+
   test('пустой текст — ошибка', () => {
     expect(() => InboxItem.create({ ...base, id: 'i1', kind: 'directive', text: ' ' }, t0)).toThrow(DomainError);
   });

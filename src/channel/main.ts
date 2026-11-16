@@ -7,6 +7,7 @@ import { SessionLocator } from '../client/locator.ts';
 import { Session } from '../domain/session.ts';
 import { SystemClock } from '../infra/system.ts';
 import { HeraldChannel } from './channel.ts';
+import { TmuxTerminal } from './tmux.ts';
 
 const log = (message: string) => process.stderr.write(`${message}\n`);
 
@@ -29,7 +30,12 @@ const herald = new HeraldClient({
   session,
   clock: new SystemClock(),
 });
-const channel = new HeraldChannel({ herald, log, permissionRelay: process.env.HERALD_PERMISSION_RELAY === '1' });
+const channel = new HeraldChannel({
+  herald,
+  log,
+  terminal: TmuxTerminal.fromEnv(process.env),
+  permissionRelay: process.env.HERALD_PERMISSION_RELAY === '1',
+});
 // Claude Code закрыл канал или процесс останавливают — herald узнаёт, что окно закрыто (сессия ⚪).
 const exit = () => void channel.close().finally(() => process.exit(0));
 channel.onclose = exit;

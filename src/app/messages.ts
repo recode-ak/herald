@@ -105,11 +105,10 @@ export class Messages {
   /** Реакция на сообщение человека: агент прочитал. */
   static readonly INBOX_READ = '👀';
 
-  /** Строка `/sessions`: на связи или давность (закрытие), последний статус. */
+  /** Строка `/sessions` (там только сессии на связи): имя и последний статус. */
   static sessionLine(session: Session, now: number): string {
     const status = session.status ? ` — ${session.status.text} (${Messages.ago(session.status.at, now)})` : '';
-    const presence = session.isOnline(now) ? 'на связи' : Messages.away(session, now);
-    return `${Messages.mark(session, now)} ${session.host} · ${session.label} — ${presence}${status}`;
+    return `${session.host} · ${session.label}${status}`;
   }
 
   /** Строка `/status`: последний статус с давностью. */
@@ -124,6 +123,16 @@ export class Messages {
   static offline(session: Session, now: number): string | undefined {
     if (session.isOnline(now)) return undefined;
     return `⚠️ ${session.label} не на связи (${Messages.away(session, now)})`;
+  }
+
+  /** Длина указания в списке непрочитанных при закрытии сессии. */
+  static readonly UNREAD_PREVIEW = 200;
+
+  /** Сессия закрылась, не прочитав указания. */
+  static unread(session: Session, texts: readonly string[]): string {
+    const preview = (t: string) =>
+      t.length > Messages.UNREAD_PREVIEW ? `${t.slice(0, Messages.UNREAD_PREVIEW - 1)}…` : t;
+    return [`⚠️ ${session.label} закрыта, указания не прочитаны:`, ...texts.map((t) => `• ${preview(t)}`)].join('\n');
   }
 
   static offlineNotice(warning: string): string {
@@ -144,7 +153,8 @@ export class Messages {
     return `${session.label} · ${session.host}`;
   }
 
-  static readonly NO_SESSIONS = 'Активных сессий нет.';
+  static readonly NO_SESSIONS = 'Сессий на связи нет.';
+  static readonly UNKNOWN_COMMAND = 'Неизвестная команда. Есть: /sessions, /status, /clear, /compact.';
   static readonly WHOM = 'Кому? Ответь reply на сообщение сессии или выбери адресата в /sessions.';
 
   static ago(at: number, now: number): string {

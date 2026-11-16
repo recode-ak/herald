@@ -20,7 +20,6 @@ export class ServerConfig {
     readonly port: number,
     readonly hostname: string,
     readonly dbPath: string,
-    readonly activeWindowMs: number,
     readonly maxWaitMs: number,
   ) {}
 
@@ -36,7 +35,6 @@ export class ServerConfig {
       ServerConfig.integer(env, 'HERALD_PORT', 4518, 0, 65_535),
       env.HERALD_HOSTNAME?.trim() || '127.0.0.1',
       env.HERALD_DB?.trim() || './data/herald.db',
-      ServerConfig.integer(env, 'HERALD_ACTIVE_HOURS', 24, 1, 24 * 365) * 3_600_000,
       ServerConfig.integer(env, 'HERALD_MAX_WAIT_SECONDS', 50, 1, HttpApi.MAX_WAIT_LIMIT_MS / 1000) * 1000,
     );
   }

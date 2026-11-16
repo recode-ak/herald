@@ -89,11 +89,27 @@ export class AgentService {
     this.deps.store.saveSession(session);
   }
 
-  /** Окно агента закрывается: сессия не на связи до следующего обращения. */
+  /**
+   * Окно агента закрывается: сессия не на связи до следующего обращения.
+   * Непрочитанные указания человеку перечисляются: новое окно их не получит (у него другой ключ).
+   */
   async bye(caller: Caller): Promise<void> {
+    const { store, telegram, access, clock } = this.deps;
     const session = this.enter(caller);
-    session.close(this.deps.clock.now());
-    this.deps.store.saveSession(session);
+    session.close(clock.now());
+    store.saveSession(session);
+    const unread = store
+      .inbox(session.key)
+      .pending()
+      .filter((i) => i.kind === 'directive');
+    if (unread.length === 0) return;
+    await telegram.send({
+      chatId: access.chatIdOf(caller.person),
+      text: Messages.unread(
+        session,
+        unread.map((i) => i.text),
+      ),
+    });
   }
 
   /** Название сессии — в шапке её сообщений. В Telegram отдельно не отправляется. */

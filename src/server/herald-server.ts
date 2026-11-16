@@ -37,7 +37,7 @@ export class HeraldServer {
     const deps = { store, telegram, access: config.access, clock, ids, waiter };
 
     const agent = new AgentService(deps);
-    const human = new HumanService({ ...deps, activeWindowMs: config.activeWindowMs });
+    const human = new HumanService(deps);
     const http = new HttpApi({ agent, access: config.access, maxWaitMs: config.maxWaitMs, log }).listen({
       port: config.port,
       hostname: config.hostname,

@@ -3,6 +3,7 @@ import { DomainError } from '../domain/errors.ts';
 import { InboxItem } from '../domain/inbox.ts';
 import { Session } from '../domain/session.ts';
 import { AgentService } from './agent.ts';
+import { Messages } from './messages.ts';
 import { ForbiddenError, NotFoundError } from './ports.ts';
 import { TelegramError } from './telegram.ts';
 import { ann, NUR_CHAT, nur, testkit } from './testkit.fake.ts';
@@ -172,10 +173,33 @@ describe('AgentService — разметка', () => {
 
 describe('AgentService.bye', () => {
   test('окно закрыто — сессия не на связи', async () => {
-    const { agent, store, clock } = setup();
+    const { agent, store, clock, telegram } = setup();
     await agent.bye(nur);
     expect(store.session(nurKey)?.closedAt).toBe(clock.now());
     expect(store.session(nurKey)?.isOnline(clock.now())).toBe(false);
+    expect(telegram.sentTo(NUR_CHAT)).toEqual([]);
+  });
+
+  test('непрочитанные указания — человеку сообщение со списком; ответы и команды не в счёт', async () => {
+    const { agent, store, clock, telegram } = setup();
+    await agent.notify(nur, 'x');
+    const post = (id: string, kind: 'directive' | 'command', text: string) =>
+      store.saveInboxItem(InboxItem.create({ id, sessionKey: nurKey, person: 'nur', kind, text }, clock.now()));
+    post('i1', 'directive', 'не трогай миграции');
+    post('i2', 'command', '/compact');
+    post('i3', 'directive', 'y'.repeat(300));
+    await agent.ack(nur, ['i1']);
+    post('i4', 'directive', 'и обнови доки');
+
+    await agent.bye(nur);
+
+    expect(telegram.last(NUR_CHAT)?.text).toBe(
+      [
+        '⚠️ u7-school закрыта, указания не прочитаны:',
+        `• ${'y'.repeat(Messages.UNREAD_PREVIEW - 1)}…`,
+        '• и обнови доки',
+      ].join('\n'),
+    );
   });
 });
 

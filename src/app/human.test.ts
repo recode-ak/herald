@@ -5,7 +5,6 @@ import { HumanService } from './human.ts';
 import type { TelegramUpdate } from './telegram.ts';
 import { ANN_CHAT, ann, NUR_CHAT, nur, testkit } from './testkit.fake.ts';
 
-const HOUR = 3_600_000;
 const nurKey = Session.keyOf(nur.session);
 const ops = { ...nur, session: { host: 'server', root: '/srv/chronicle' } };
 const db = {
@@ -20,7 +19,7 @@ const db = {
 function setup() {
   const kit = testkit();
   let updateId = 0;
-  const human = new HumanService({ ...kit, activeWindowMs: 24 * HOUR });
+  const human = new HumanService(kit);
   return {
     ...kit,
     agent: new AgentService(kit),
@@ -223,24 +222,27 @@ describe('Указания', () => {
 });
 
 describe('/sessions и /status', () => {
-  test('/sessions — активные сессии с давностью и статусом, недавние первыми', async () => {
+  test('/sessions — только сессии на связи, со статусом, недавние первыми; закрытые и молчащие не видны', async () => {
     const k = setup();
+    const herald = { ...nur, session: { host: 'laptop', root: '/home/nur/dev/herald' } };
+    const old = { ...nur, session: { host: 'laptop', root: '/home/nur/dev/old' } };
     await k.agent.status(ops, 'бэкап');
-    k.clock.advance(25 * HOUR);
+    await k.agent.notify(old, 'x');
+    await k.agent.bye(old);
+    k.clock.advance(Session.ONLINE_MS);
     await k.agent.status(nur, 'Фаза 2: сценарии');
-    k.clock.advance(5 * 60_000);
-    await k.agent.notify({ ...nur, session: { host: 'laptop', root: '/home/nur/dev/herald' } }, 'x');
-    k.clock.advance(2 * HOUR);
+    k.clock.advance(60_000);
+    await k.agent.notify(herald, 'x');
 
     await k.say(NUR_CHAT, '/sessions');
     const menu = k.telegram.last(NUR_CHAT)!;
     expect(menu.text).toBe(
       [
-        'Активные сессии:',
-        '⚪ laptop · herald — 2 ч назад',
-        '⚪ laptop · u7-school — 2 ч назад — Фаза 2: сценарии (2 ч назад)',
+        'Сессии на связи:',
+        'laptop · herald',
+        'laptop · u7-school — Фаза 2: сценарии (1 мин назад)',
         '',
-        'Выбери адресата указания.',
+        'Выбери адресата указания или команды (/clear, /compact).',
       ].join('\n'),
     );
     expect(menu.buttons!.map((row) => row.map((b) => b.text))).toEqual([['herald · laptop'], ['u7-school · laptop']]);
@@ -265,34 +267,82 @@ describe('/sessions и /status', () => {
     expect(k.telegram.last(NUR_CHAT)?.text).toBe('⚪ server · chronicle — бэкап (3 мин назад)');
   });
 
-  test('нет активных сессий', async () => {
+  test('нет сессий на связи', async () => {
     const k = setup();
+    await k.agent.status(nur, 'Ф4');
+    k.clock.advance(Session.ONLINE_MS + 1);
     await k.say(NUR_CHAT, '/sessions');
-    expect(k.telegram.last(NUR_CHAT)?.text).toBe('Активных сессий нет.');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('Сессий на связи нет.');
     await k.say(NUR_CHAT, '/status');
-    expect(k.telegram.last(NUR_CHAT)?.text).toBe('Активных сессий нет.');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('Сессий на связи нет.');
   });
 
   test('сессия без статуса в /status', async () => {
     const k = setup();
     await k.agent.notify(nur, 'x');
-    k.clock.advance(3 * 24 * HOUR - 1);
-    const human = new HumanService({ ...k, activeWindowMs: 7 * 24 * HOUR });
-    await human.handle({ kind: 'message', updateId: 1, chatId: NUR_CHAT, messageId: 50, text: '/status' });
-    expect(k.telegram.last(NUR_CHAT)?.text).toBe('⚪ laptop · u7-school — статуса нет (2 дн назад)');
+    await k.say(NUR_CHAT, '/status');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('🟢 laptop · u7-school — статуса нет (только что)');
   });
 
-  test('на связи и закрытые: 🟢 — на связи, ⚪ — давность или «закрыта»', async () => {
+  test('/status списком — только на связи; закрытая сессия не видна', async () => {
     const k = setup();
     await k.agent.status(nur, 'Ф4');
-    await k.agent.notify({ ...nur, session: { host: 'laptop', root: '/home/nur/dev/herald' } }, 'x');
-    await k.agent.bye({ ...nur, session: { host: 'laptop', root: '/home/nur/dev/herald' } });
-    k.clock.advance(60_000);
+    await k.agent.status(ops, 'бэкап');
+    await k.agent.bye(ops);
+    await k.say(NUR_CHAT, '/status');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('🟢 laptop · u7-school — Ф4 (только что)');
+  });
+});
+
+describe('Команды терминала', () => {
+  test('/sessions → сессия → /clear: команда во входящих, реакция ✍, адресат сброшен', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
     await k.say(NUR_CHAT, '/sessions');
-    expect(k.telegram.last(NUR_CHAT)?.text.split('\n').slice(1, 3)).toEqual([
-      '⚪ laptop · herald — закрыта 1 мин назад',
-      '🟢 laptop · u7-school — на связи — Ф4 (1 мин назад)',
+    const menu = k.telegram.last(NUR_CHAT)!;
+    await k.press(NUR_CHAT, menu.messageId, menu.buttons![0]![0]!.data);
+
+    await k.say(NUR_CHAT, '/clear');
+    expect((await k.agent.inbox(nur)).map((i) => [i.kind, i.text])).toEqual([['command', '/clear']]);
+    expect(k.telegram.reaction(NUR_CHAT, 1003)).toBe('✍');
+
+    await k.say(NUR_CHAT, 'ещё');
+    expect(k.telegram.last(NUR_CHAT)?.text).toStartWith('Кому?');
+  });
+
+  test('reply на сообщение сессии (и на её вопрос) — команда этой сессии, не ответ', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    await k.say(NUR_CHAT, '/compact', k.telegram.last(NUR_CHAT)!.messageId);
+    const q = await k.agent.ask(nur, db);
+    await k.say(NUR_CHAT, '/clear@herald_bot', k.telegram.last(NUR_CHAT)!.messageId);
+
+    expect((await k.agent.inbox(nur)).map((i) => [i.kind, i.text])).toEqual([
+      ['command', '/compact'],
+      ['command', '/clear'],
     ]);
+    expect(k.store.question(q.id)?.status).toBe('open');
+  });
+
+  test('команда без адресата — «Кому?»', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    await k.say(NUR_CHAT, '/compact');
+    expect(await k.agent.inbox(nur)).toEqual([]);
+    expect(k.telegram.last(NUR_CHAT)?.text).toStartWith('Кому?');
+  });
+
+  test('неизвестная команда — список команд, выбранный адресат сохраняется', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    await k.say(NUR_CHAT, '/sessions');
+    const menu = k.telegram.last(NUR_CHAT)!;
+    await k.press(NUR_CHAT, menu.messageId, menu.buttons![0]![0]!.data);
+
+    await k.say(NUR_CHAT, '/model opus');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('Неизвестная команда. Есть: /sessions, /status, /clear, /compact.');
+    await k.say(NUR_CHAT, 'стоп');
+    expect((await k.agent.inbox(nur)).map((i) => [i.kind, i.text])).toEqual([['directive', 'стоп']]);
   });
 });
 

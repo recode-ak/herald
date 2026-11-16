@@ -23,7 +23,7 @@ afterEach(() => {
 function setup(maxWaitMs = 30_000) {
   const kit = testkit();
   const agent = new AgentService(kit);
-  const human = new HumanService({ ...kit, activeWindowMs: 86_400_000 });
+  const human = new HumanService(kit);
   const api = new HttpApi({ agent, access: kit.access, maxWaitMs });
   const server = api.listen({ port: 0, hostname: '127.0.0.1' });
   servers.push(server);

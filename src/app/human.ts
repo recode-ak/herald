@@ -1,6 +1,6 @@
 import type { Access, PersonId } from '../domain/access.ts';
 import { DomainError } from '../domain/errors.ts';
-import { InboxItem } from '../domain/inbox.ts';
+import { InboxItem, type InboxKind } from '../domain/inbox.ts';
 import type { Choice, Question } from '../domain/question.ts';
 import type { Session } from '../domain/session.ts';
 import { Messages } from './messages.ts';
@@ -17,15 +17,14 @@ export interface HumanDeps {
   clock: Clock;
   ids: Ids;
   waiter: Waiter;
-  /** Сессия активна, пока с последнего обращения агента прошло не больше окна. */
-  activeWindowMs: number;
 }
 
 type MessageUpdate = Extract<TelegramUpdate, { kind: 'message' }>;
 type CallbackUpdate = Extract<TelegramUpdate, { kind: 'callback' }>;
 
 /**
- * Сценарии человека — разбор апдейтов Telegram: кнопки вопросов, reply, `/sessions`, `/status`.
+ * Сценарии человека — разбор апдейтов Telegram: кнопки вопросов, reply, `/sessions`, `/status`,
+ * команды терминала сессии (`/clear`, `/compact`).
  * Принимаются только апдейты chat_id из доступа и только по сессиям своего человека.
  */
 export class HumanService {
@@ -72,22 +71,25 @@ export class HumanService {
     const command = text.startsWith('/') ? text.split(/\s/, 1)[0]?.split('@', 1)[0] : undefined;
     if (command === '/sessions') return this.sessionsMenu(person, update.chatId);
     if (command === '/status') return this.statusReport(person, update);
-    if (command) return Messages.WHOM;
+    if (command && !InboxItem.isCommand(command)) return Messages.UNKNOWN_COMMAND;
 
     if (update.replyTo !== undefined) {
       const link = this.deps.store.link(update.chatId, update.replyTo);
       if (!link) return Messages.WHOM;
+      if (command) return this.post(person, link.sessionKey, 'command', command, update);
       if (link.questionId) {
         await this.answer(person, link.questionId, { text }, update);
         return undefined;
       }
-      return this.directive(person, link.sessionKey, text, update);
+      return this.post(person, link.sessionKey, 'directive', text, update);
     }
 
     const target = this.deps.store.chatTarget(update.chatId);
     if (!target) return Messages.WHOM;
     this.deps.store.setChatTarget(update.chatId, undefined);
-    return this.directive(person, target, text, update);
+    return command
+      ? this.post(person, target, 'command', command, update)
+      : this.post(person, target, 'directive', text, update);
   }
 
   /** Ответ на вопрос: кнопкой (`option`) или reply (`text`). Поздний — в `late-answer`. */
@@ -151,15 +153,17 @@ export class HumanService {
     return `Адресат: ${session.project}`;
   }
 
-  private async directive(
+  /** Указание или команда терминала — во входящие сессии. */
+  private async post(
     person: PersonId,
     sessionKey: string,
+    kind: Extract<InboxKind, 'directive' | 'command'>,
     text: string,
     update: MessageUpdate,
   ): Promise<undefined> {
     const session = this.ownSession(person, sessionKey);
     const item = InboxItem.create(
-      { id: this.deps.ids.next('i'), sessionKey, person, kind: 'directive', text },
+      { id: this.deps.ids.next('i'), sessionKey, person, kind, text },
       this.deps.clock.now(),
     );
     this.deps.store.saveInboxItem(item);
@@ -171,17 +175,17 @@ export class HumanService {
   }
 
   private async sessionsMenu(person: PersonId, chatId: number): Promise<undefined> {
-    const sessions = this.activeSessions(person);
+    const sessions = this.onlineSessions(person);
     if (sessions.length === 0) {
       await this.deps.telegram.send({ chatId, text: Messages.NO_SESSIONS });
       return undefined;
     }
     const now = this.deps.clock.now();
     const text = [
-      'Активные сессии:',
+      'Сессии на связи:',
       ...sessions.map((s) => Messages.sessionLine(s, now)),
       '',
-      'Выбери адресата указания.',
+      'Выбери адресата указания или команды (/clear, /compact).',
     ];
     await this.deps.telegram.send({
       chatId,
@@ -194,14 +198,15 @@ export class HumanService {
   private statusReport(person: PersonId, update: MessageUpdate): string {
     const now = this.deps.clock.now();
     const link = update.replyTo !== undefined ? this.deps.store.link(update.chatId, update.replyTo) : undefined;
-    const sessions = link ? [this.ownSession(person, link.sessionKey)] : this.activeSessions(person);
+    const sessions = link ? [this.ownSession(person, link.sessionKey)] : this.onlineSessions(person);
     if (sessions.length === 0) return Messages.NO_SESSIONS;
     return sessions.map((s) => Messages.statusLine(s, now)).join('\n');
   }
 
-  private activeSessions(person: PersonId): Session[] {
+  /** Сессии с пульсом: закрытые и молчащие дольше `Session.ONLINE_MS` не показываются. */
+  private onlineSessions(person: PersonId): Session[] {
     const now = this.deps.clock.now();
-    return this.deps.store.sessionsOf(person).filter((s) => s.isActive(now, this.deps.activeWindowMs));
+    return this.deps.store.sessionsOf(person).filter((s) => s.isOnline(now));
   }
 
   private ownQuestion(person: PersonId, questionId: string): Question {

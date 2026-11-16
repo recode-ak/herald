@@ -73,12 +73,6 @@ describe('Session', () => {
     expect(() => s.setStatus('x'.repeat(Session.STATUS_MAX + 1), t0)).toThrow(DomainError);
   });
 
-  test('активна в пределах окна от последнего обращения', () => {
-    const s = Session.open({ person: 'nur', host: 'h', root: '/x' }, t0);
-    expect(s.isActive(t0 + 12 * HOUR, 12 * HOUR)).toBe(true);
-    expect(s.isActive(t0 + 12 * HOUR + 1, 12 * HOUR)).toBe(false);
-  });
-
   test('на связи — обращение не старше ONLINE_MS и окно не закрыто; новое обращение снимает закрытие', () => {
     const s = Session.open({ person: 'nur', host: 'h', root: '/x' }, t0);
     expect(s.isOnline(t0 + Session.ONLINE_MS)).toBe(true);

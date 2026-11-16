@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { JSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
-import { HeraldChannel } from './channel.ts';
+import { HeraldChannel, type Terminal } from './channel.ts';
 import { FakeHerald } from './herald.fake.ts';
 
 const cleanup: (() => unknown)[] = [];
@@ -10,7 +10,7 @@ afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
 
-async function setup(options: { permissionRelay?: boolean } = {}) {
+async function setup(options: { permissionRelay?: boolean; terminal?: Terminal } = {}) {
   const herald = new FakeHerald();
   const logs: string[] = [];
   const channel = new HeraldChannel({ herald, log: (m) => logs.push(m), retryDelayMs: 5, ...options });
@@ -185,6 +185,42 @@ describe('HeraldChannel — входящие событиями', () => {
     const polls = herald.polls;
     await Bun.sleep(30);
     expect(herald.polls).toBe(polls);
+  });
+});
+
+describe('HeraldChannel — команды терминала', () => {
+  test('команда → терминал окна, событием в сессию не идёт; подтверждение прочтения', async () => {
+    const sent: string[] = [];
+    const { herald, channel, events, until } = await setup({ terminal: { send: async (c) => void sent.push(c) } });
+    channel.start();
+    herald.push(
+      { id: 'i_1', kind: 'command', text: '/compact', createdAt: 1 },
+      { id: 'i_2', kind: 'directive', text: 'дальше', createdAt: 2 },
+    );
+    await until(() => herald.acked.length === 2);
+    expect(sent).toEqual(['/compact']);
+    expect(events.map((e) => e.params?.content)).toEqual(['дальше']);
+    expect(herald.notified).toEqual([]);
+  });
+
+  test('окно не в tmux или сбой терминала — человеку уведомление, прочтение подтверждается', async () => {
+    const none = await setup();
+    none.channel.start();
+    none.herald.push({ id: 'i_1', kind: 'command', text: '/clear', createdAt: 1 });
+    await none.until(() => none.herald.acked.length === 1);
+    expect(none.herald.notified).toEqual(['⚠️ /clear не выполнена: окно агента запущено не в tmux.']);
+
+    const broken = await setup({
+      terminal: {
+        send: async () => {
+          throw new Error('no server running');
+        },
+      },
+    });
+    broken.channel.start();
+    broken.herald.push({ id: 'i_1', kind: 'command', text: '/compact', createdAt: 1 });
+    await broken.until(() => broken.herald.acked.length === 1);
+    expect(broken.herald.notified).toEqual(['⚠️ /compact не выполнена: no server running']);
   });
 });
 

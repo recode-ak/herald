@@ -17,8 +17,15 @@ export interface ChannelHerald {
   ack(ids: readonly string[]): Promise<string[]>;
 }
 
+/** Терминал окна агента: команды `/clear`, `/compact` набираются в нём (реализация — `TmuxTerminal`). */
+export interface Terminal {
+  send(command: string): Promise<void>;
+}
+
 export interface HeraldChannelOptions {
   herald: ChannelHerald;
+  /** Нет — окно не в tmux: команды не выполняются, человеку уходит уведомление. */
+  terminal?: Terminal;
   log?: (message: string) => void;
   /** Long poll входящих за один запрос клиента. */
   inboxWaitMs?: number;
@@ -211,6 +218,7 @@ export class HeraldChannel {
         if (!this.running) return;
         for (const item of items) {
           if (item.questionId !== undefined && this.permissions.has(item.questionId)) await this.permit(item);
+          else if (item.kind === 'command') await this.execute(item.text);
           else await this.deliver(item);
         }
         if (items.length > 0) await this.herald.ack(items.map((i) => i.id));
@@ -218,6 +226,17 @@ export class HeraldChannel {
         this.log(`herald channel: входящие: ${HeraldChannel.message(error)}`);
         await Bun.sleep(this.options.retryDelayMs ?? 5_000);
       }
+    }
+  }
+
+  /** Команда терминала: набрать в окне агента; не вышло — сказать человеку (прочтение всё равно подтверждается). */
+  private async execute(command: string): Promise<void> {
+    const { terminal } = this.options;
+    try {
+      if (!terminal) throw new Error('окно агента запущено не в tmux.');
+      await terminal.send(command);
+    } catch (error) {
+      await this.herald.notify(`⚠️ ${command} не выполнена: ${HeraldChannel.message(error)}`);
     }
   }
 

@@ -117,10 +117,6 @@ export class Session {
     this.touch(now);
   }
 
-  isActive(now: number, windowMs: number): boolean {
-    return now - this.state.lastSeenAt <= windowMs;
-  }
-
   toState(): SessionState {
     return { ...this.state };
   }

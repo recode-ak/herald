@@ -77,6 +77,7 @@ claude --dangerously-load-development-channels server:herald
 |---|---|
 | `HERALD_SESSION` | явное имя сессии вместо корня git (`[host · имя]`) |
 | `CLAUDE_CODE_SESSION_ID` | ставит Claude Code: окно сессии (`[host · проект·02dc]`), см. `docs/model.md` «CLI» |
+| `TMUX_PANE` | ставит tmux: панель окна, куда канал набирает `/clear` и `/compact` из Telegram. Claude Code не в tmux — эти команды не выполняются |
 | `HERALD_PERMISSION_RELAY=1` | подтверждение действий Claude Code из Telegram: запрос разрешения приходит вопросом «Разрешить / Запретить». По умолчанию выключено |
 | `HERALD_URL`, `HERALD_TOKEN`, `HERALD_HOST`, `HERALD_CONFIG` | переопределить настройки клиента |
 

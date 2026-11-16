@@ -13,7 +13,7 @@ const db = {
 
 function setup() {
   const kit = testkit();
-  const human = new HumanService({ ...kit, activeWindowMs: 86_400_000 });
+  const human = new HumanService(kit);
   let updateId = 0;
   return {
     ...kit,

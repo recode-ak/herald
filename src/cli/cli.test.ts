@@ -29,7 +29,7 @@ function setup() {
     ids: new SeqIds(),
     waiter: new Waiter(clock),
   };
-  const human = new HumanService({ ...deps, activeWindowMs: 86_400_000 });
+  const human = new HumanService(deps);
   const server = new HttpApi({ agent: new AgentService(deps), access: deps.access, maxWaitMs: 40 }).listen({
     port: 0,
     hostname: '127.0.0.1',
