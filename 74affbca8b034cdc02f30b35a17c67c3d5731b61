@@ -1,0 +1,4 @@
+Контрольная точка Фазы 7 «Перевод Автопилота и итог» (Автопилот: ручная проверка считается пройденной).
+Автотесты: bun run check — biome чисто, tsc чисто, 249 pass / 0 fail. Новых кодовых файлов в фазе нет (изменения — plan.md, summary.md и файлы вне репо).
+Критерии фазы: КП 9 — ~/.pi/agent/AGENTS.md переведён на herald (ask/decide/status/inbox/notify, канал); удаление agent-notify — за Нурболатом (агенту запрещено). Финальный гейт зелёный. Итог — summary.md.
+План ручной проверки: 1) rm ~/.local/bin/agent-notify ~/.local/bin/agent-notify.env; 2) claude --dangerously-load-development-channels server:herald → reply боту → событие в сессии; ask → кнопка → событие answer (КП 6); 3) сообщение боту со второго аккаунта — без ответа (КП 7); 4) herald status "…" → /status в боте показывает статус.
