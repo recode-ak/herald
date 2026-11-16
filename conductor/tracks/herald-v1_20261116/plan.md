@@ -104,7 +104,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] Бэкап не нужен (решение Нурболата 2026-11-16): `backup.contract`, `scripts/backup.sh` и снимок pre-deploy удалены, `db-backups/` на сервере удалён
 - [x] Task: Смоук на реальном боте — КП 1–7, результат — в git note (ded6c34)
     - [x] КП 1, 2, 3, 4, 5 и неверный токен (КП 7) — CLI с ноутбука через `https://herald.u7-hub.kz`, ответы Нурболата в Telegram
-    - [ ] Чужой chat_id (КП 7) — Нурболат проверит со второго аккаунта позже; до того — тест `human.test.ts`
+    - [x] Чужой chat_id (КП 7) — Нурболат со второго аккаунта: `/start`, `/status` — без ответа; тест `human.test.ts`
     - [ ] КП 6 (канал в живой сессии Claude Code) — перенесён в Фазу 7, после подключения канала
 - [x] Task: Conductor - User Manual Verification 'Фаза 6: Деплой и установка' (d3640e3) (Protocol in workflow.md)
 
@@ -120,7 +120,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Инструкция «Автопилот» в `~/.pi/agent/AGENTS.md` → herald (`ask`, `status` и `inbox` на границах задач, канал в Claude Code); память агента; удалить `~/.local/bin/agent-notify` и `agent-notify.env`
     - [x] `~/.pi/agent/AGENTS.md`, «Автопилот»: п. 4 — вопросы `ask` (канал или CLI `--timeout 180`), `decide` по таймауту, «Жди меня», поздние ответы; п. 6 — `status` и `inbox --ack` на границах задач; п. 7 — `herald notify`; запасной путь — терминал
     - [x] Память агента (u7-school, `feedback-finish-then-stop`) → herald
-    - [ ] Удалить `~/.local/bin/agent-notify` и `agent-notify.env` — агенту запрещено, за Нурболатом: `rm ~/.local/bin/agent-notify ~/.local/bin/agent-notify.env`
+    - [x] Удалить `~/.local/bin/agent-notify` и `agent-notify.env` — удалил Нурболат, проверено агентом
 - [x] Task: Финальный гейт — `bun run check`, сравнение с базовой линией; `summary.md` трека: сделанное, решения (вопрос → варианты → выбранное → как переиграть), отложенное (7894f9a)
 - [x] Task: Conductor - User Manual Verification 'Фаза 7: Перевод Автопилота и итог' (74affbc) (Protocol in workflow.md)
 

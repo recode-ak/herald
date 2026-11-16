@@ -25,16 +25,14 @@ Spec — [spec.md](./spec.md), план — [plan.md](./plan.md). Трек: 2026
 |---|---|
 | 1–5 | ✅ смоук на реальном боте (CLI с ноутбука), e2e-тесты |
 | 6 — канал в живой сессии Claude Code | ⏳ за Нурболатом (ниже); e2e канала по stdio — зелёный |
-| 7 — неверный токен | ✅ смоук; **чужой chat_id** — тест `human.test.ts`, живая проверка со второго аккаунта — за Нурболатом |
+| 7 — неверный токен и чужой chat_id | ✅ смоук; чужой chat_id — второй аккаунт (`/start`, `/status` без ответа) и тест `human.test.ts` |
 | 8 — деплой и установка ≤ 5 команд | ✅ |
-| 9 — Автопилот на herald | ✅, кроме удаления `agent-notify` (агенту запрещено — ниже) |
+| 9 — Автопилот на herald | ✅ (`agent-notify` удалил Нурболат) |
 
 ## За Нурболатом
 
-1. Удалить старый notifier: `rm ~/.local/bin/agent-notify ~/.local/bin/agent-notify.env`.
-2. КП 6: запустить `claude --dangerously-load-development-channels server:herald` в любом проекте → написать reply боту → указание приходит в сессию; попросить агента `ask` → нажать кнопку → событие `answer`. Удобно — алиас в `~/.bashrc`.
-3. По желанию — `permissions.allow` в `~/.claude/settings.json`: `mcp__herald__reply`, `mcp__herald__notify`, `mcp__herald__ask`, `mcp__herald__decide`, `mcp__herald__status`.
-4. КП 7: написать боту со второго аккаунта — ответа быть не должно.
+1. КП 6: запустить `claude --dangerously-load-development-channels server:herald` в любом проекте → написать reply боту → указание приходит в сессию; попросить агента `ask` → нажать кнопку → событие `answer`. Удобно — алиас в `~/.bashrc`.
+2. По желанию — `permissions.allow` в `~/.claude/settings.json`: `mcp__herald__reply`, `mcp__herald__notify`, `mcp__herald__ask`, `mcp__herald__decide`, `mcp__herald__status`.
 
 ## Решения
 
@@ -48,6 +46,10 @@ Spec — [spec.md](./spec.md), план — [plan.md](./plan.md). Трек: 2026
 | Граница фаз | `notify` и ожидание / `ask` «сброс / продолжаю здесь» | `ask` — ответ кнопкой, тот же механизм таймаута | п. 5 |
 | Данные, push, выкатка, деструктивный git | `notify` и ожидание в терминале / `ask` без `--timeout` | `ask` без таймаута — ответ виден агенту сразу, из Telegram | последний абзац раздела |
 | herald недоступен | стоп / терминал с ожиданием по п. 4 | терминал — работа не стоит из-за посредника | абзац «herald:» |
+
+## После трека
+
+Нурболат по итогам работы через Telegram добавил (на `main`, выкачено): квитанции реакциями, «Жди меня» только у открытого вопроса (4df44bd); окно сессии Claude Code и название от агента (1c7416d); кнопки убираются после ответа (eb73519); Markdown агента → HTML Telegram (c50dd04); метки «кто на связи» 🟢/⚪ (094ccee). Гейт — 284 pass / 0 fail.
 
 ## Отложено
 
