@@ -50,7 +50,8 @@ const USAGE = `herald — вопросы и уведомления челове�
   herald title <текст>                          название сессии — в шапке её сообщений
   herald ask <вопрос> [-o "A: текст"]… [--recommended A] [--timeout <с>]
                                                 вопрос; ждёт ответа (без --timeout — бесконечно,
-                                                и decide по нему запрещён)
+                                                и decide по нему запрещён; после «Жди меня» —
+                                                тоже бесконечно)
   herald ask --questions '<JSON>' [--timeout <с>]
                                                 пачка связанных вопросов: человек получает их
                                                 по одному, ответы — все сразу (items в выводе);
@@ -160,7 +161,12 @@ export class Cli {
       };
     }
     const asked = await client.ask({ ...question, ...(timeoutMs !== undefined && { timeoutMs }) });
-    const result = Cli.result(await client.awaitQuestion(asked.id, timeoutMs));
+    let answer = await client.awaitQuestion(asked.id, timeoutMs);
+    // «Жди меня»: решать агенту нельзя — ждём человека без срока, а не выходим с «нет ответа».
+    if (answer.status === 'open' && answer.heldAt !== undefined && answer.terminalAt === undefined) {
+      answer = await client.awaitQuestion(asked.id);
+    }
+    const result = Cli.result(answer);
     this.print(result);
     return result.status === 'timeout' ? 2 : result.status === 'terminal' ? 3 : 0;
   }

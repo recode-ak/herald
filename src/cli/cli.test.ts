@@ -195,6 +195,17 @@ describe('herald ask', () => {
     expect(r.json.id).toBeString();
   });
 
+  test('«Жди меня» — после срока ask ждёт дальше, без срока, до ответа человека', async () => {
+    const k = setup();
+    const running = k.run(['ask', 'БД?', '-o', 'A: SQLite', '--recommended', 'A', '--timeout', '1']);
+    const msg = await k.asked();
+    const id = msg.buttons![0]![0]!.data.split(':')[1];
+    await k.press(`h:${id}`);
+    await Bun.sleep(1_300);
+    await k.reply('Postgres');
+    expect(await running).toMatchObject({ code: 0, json: { id, status: 'answered', text: 'Postgres' } });
+  });
+
   test('без --timeout ждёт дольше одного long poll; в сообщении — время не ограничено, «Жди меня» нет', async () => {
     const k = setup();
     const running = k.run(['ask', 'Как назвать?', '-o', 'A: herald']);

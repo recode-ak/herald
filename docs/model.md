@@ -174,7 +174,7 @@ Telegram опрашивается long polling `getUpdates` (25 с); offset хр
 | `herald notify <текст>` | `{ ok: true }` |
 | `herald status <текст>` | `{ ok: true }` — в Telegram не отправляется |
 | `herald title <текст>` | `{ ok: true }` — название сессии в шапке |
-| `herald ask <вопрос> [-o "A: текст"]… [--recommended A] [--timeout <с>]` | `{ id, status, by?, option?, text?, reason? }`; `--timeout` уходит на сервер сроком вопроса; без него ждёт бесконечно, `decide` по вопросу запрещён |
+| `herald ask <вопрос> [-o "A: текст"]… [--recommended A] [--timeout <с>]` | `{ id, status, by?, option?, text?, reason? }`; `--timeout` уходит на сервер сроком вопроса; без него ждёт бесконечно, `decide` по вопросу запрещён; человек нажал «Жди меня» до срока — после срока ждёт дальше, без срока |
 | `herald ask --questions '<JSON>' [--timeout <с>]` | пачка `[{ "text", "options": [{ "id", "text" }], "recommended" }]`; `{ id, status, items: [{ item, by, option?, text?, reason? }] }` |
 | `herald decide <id> (<вариант> \| --text <текст> \| --answers '<JSON>') --reason <причина>` | то же, `status: decided`; `--answers '[{ "item": 2, "text": "…" }]'`, прочие пункты — рекомендованные |
 | `herald answered <id> (<вариант> \| --text <текст> \| --answers '<JSON>')` | то же, `status: answered` — человек ответил в терминале |
