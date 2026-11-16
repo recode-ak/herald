@@ -2,7 +2,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
 # deploy.sh — обновление herald на сервере (запускать в /srv/herald).
 #
-# Шаги: снимок БД pre-deploy → git pull → зависимости по bun.lock → pm2 restart → health.
+# Шаги: git pull → зависимости по bun.lock → pm2 restart → health.
 # Первый запуск (процесса в pm2 ещё нет) — pm2 start.
 # ═══════════════════════════════════════════════════════════════════════════
 set -euo pipefail
@@ -12,10 +12,6 @@ cd "$PROJECT_ROOT"
 export PATH="${HOME}/.bun/bin:${PATH}"
 PORT="$(grep -E '^HERALD_PORT=' .env 2>/dev/null | cut -d= -f2 || true)"
 PORT="${PORT:-4518}"
-
-if [ -f data/herald.db ]; then
-  bash scripts/backup.sh pre-deploy --force
-fi
 
 git pull --ff-only
 bun install --production --frozen-lockfile

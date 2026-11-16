@@ -21,7 +21,7 @@ HERALD_TOKENS=nur:<длинный случайный токен>,nur:<токен
 HERALD_PEOPLE=nur:<chat_id>
 ```
 
-Токен агента — любая длинная случайная строка (`openssl rand -hex 24`). Постоянная работа — менеджер процессов (`pm2 start "bun src/server/main.ts" --name herald --cwd <herald>`), публикация наружу — reverse proxy с `proxy_read_timeout` больше `HERALD_MAX_WAIT_SECONDS` (по умолчанию 50 с). Проверка — `curl -s http://127.0.0.1:4518/health`. Пример целиком (pm2, nginx, бэкап, обновление) — [deploy.md](deploy.md).
+Токен агента — любая длинная случайная строка (`openssl rand -hex 24`). Постоянная работа — менеджер процессов (`pm2 start "bun src/server/main.ts" --name herald --cwd <herald>`), публикация наружу — reverse proxy с `proxy_read_timeout` больше `HERALD_MAX_WAIT_SECONDS` (по умолчанию 50 с). Проверка — `curl -s http://127.0.0.1:4518/health`. Пример целиком (pm2, nginx, обновление) — [deploy.md](deploy.md).
 
 Сервер с ботом должен быть один: Telegram отдаёт апдейты одному опрашивающему.
 

@@ -35,7 +35,7 @@
 - HTTP API с Bearer-токеном. Ожидание ответа и входящих — long poll.
 - Протокол Channels — research preview. Канал — тонкий слой над тем же HTTP-клиентом, что и CLI: если протокол изменится, правится только канал.
 - TDD, `bun run check`. Telegram и сервер в тестах — фейки.
-- Деплой как у chronicle: `/srv/herald`, pm2, nginx `herald.u7-hub.kz`, бэкап через `backup.contract`.
+- Деплой как у chronicle: `/srv/herald`, pm2, nginx `herald.u7-hub.kz`; без бэкапа (решение 2026-11-16).
 
 ## Критерии приёмки
 
