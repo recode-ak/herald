@@ -1,0 +1,7 @@
+Задача: Сценарии агента (Фаза 2).
+- src/app/agent.ts — AgentService: notify (шапка [host · проект], связь сообщения с сессией), ask (кнопки вариантов с ⭐ и «Жди меня», callback_data ≤ 64 байт, при ошибке доставки вопрос не сохраняется), decide (правка сообщения, кнопки остаются), status (без Telegram), inbox, ack (отметка → «прочитано агентом»). Каждое обращение регистрирует/отмечает сессию; сессия другого человека — ForbiddenError.
+- src/app/messages.ts — тексты и кнопки бота (вопрос рендерится из состояния: решение, удержание, переигрывания).
+- src/app/ports.ts — Clock, Ids, Caller, NotFoundError, ForbiddenError.
+- src/app/testkit.fake.ts — ManualClock, SeqIds, testkit() (SQLite :memory:, FakeTelegram, два человека).
+- FakeTelegram отдаёт копии сообщений.
+Правки Telegram для отметок и обновления вопроса — best effort: сбой не отменяет сохранённое.
