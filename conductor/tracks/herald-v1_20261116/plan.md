@@ -75,8 +75,8 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: MCP-сервер канала объявляет `claude/channel`, отдаёт инструменты, доставляет входящие событиями и подтверждает прочтение; подтверждение действий — по настройке; `docs/install.md` описывает подключение.
 
-- [ ] Task: Зависимость `@modelcontextprotocol/sdk` (согласована в spec) — `package.json`, `tech-stack.md`
-- [ ] Task: Сервер канала (stdio)
+- [x] Task: Зависимость `@modelcontextprotocol/sdk` (согласована в spec) — `package.json`, `tech-stack.md` (3cdba9b)
+- [~] Task: Сервер канала (stdio)
     - [ ] Тесты (фейковый клиент herald, транспорт MCP в памяти): capability, инструменты `reply`/`notify`, `ask` (сразу id), `decide`, `status`; цикл входящих → `notifications/claude/channel` с `meta` (вид, id вопроса) → подтверждение прочтения
     - [ ] Реализация `src/channel`
 - [ ] Task: Подтверждение действий из Telegram
