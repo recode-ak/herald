@@ -11,7 +11,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: `Store.purge(cutoff, { dryRun })` — правила политики, счётчики удалённого и оставшегося (7ba357c)
 - [x] Task: Команда `bun run purge` — аргументы, `HERALD_RETENTION_DAYS`, JSON, коды выхода (c93e5b3)
 - [x] Task: Бот — кнопка на удалённом вопросе: «вопрос устарел и удалён» (23f0480)
-- [ ] Task: Документы — `docs/model.md` «Хранение», `docs/deploy.md`, `docs/install.md`
+- [x] Task: Документы — `docs/model.md` «Хранение», `docs/deploy.md`, `docs/install.md` (bb214e8)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 1: Очистка в herald' (Protocol in workflow.md)
 
 ## Фаза 2: server-ops и выкатка
