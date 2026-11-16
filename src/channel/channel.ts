@@ -2,6 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { AskRequest } from '../client/client.ts';
+import type { InboxKind } from '../domain/inbox.ts';
 import type { Choice, QuestionOption } from '../domain/question.ts';
 import type { InboxItemWire, QuestionWire } from '../http/wire.ts';
 
@@ -13,7 +14,7 @@ export interface ChannelHerald {
   bye(): Promise<void>;
   ask(request: AskRequest): Promise<QuestionWire>;
   decide(id: string, choice: Choice, reason: string): Promise<QuestionWire>;
-  inbox(waitMs?: number): Promise<InboxItemWire[]>;
+  inbox(waitMs?: number, kinds?: readonly InboxKind[]): Promise<InboxItemWire[]>;
   ack(ids: readonly string[]): Promise<string[]>;
 }
 
@@ -36,6 +37,14 @@ export interface HeraldChannelOptions {
    * Отвечать может только человек токена: herald принимает ответы лишь с его chat_id.
    */
   permissionRelay?: boolean;
+  /**
+   * Claude Code принимает события канала (запущен с флагом канала, см. `ClaudeLaunch`). По умолчанию — да.
+   * Нет — входящие не отправляются событиями и не подтверждаются: агент забирает их инструментом `inbox`,
+   * цикл берёт только команды терминала (и держит пульс).
+   */
+  events?: boolean;
+  /** Без событий не предупреждать человека при старте (разовый `claude -p`). */
+  silent?: boolean;
 }
 
 /** Запрос Claude Code на подтверждение действия. */
@@ -53,20 +62,45 @@ class ToolArgsError extends Error {
 
 type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
-const INSTRUCTIONS = [
+const COMMON = [
   'herald — связь с человеком через Telegram. Человек читает Telegram, а не эту сессию: всё, что он должен увидеть, отправляй инструментом reply (или notify). Вывод в транскрипт до него не доходит.',
   '',
   'Текст для человека (reply, notify, ask и варианты) — коротко, с абзацами; можно Markdown: **жирный**, _курсив_, `код`, блоки ```, [ссылка](https://…), списки «- ». Таблицы и прочее не поддержаны — уйдут как есть.',
   '',
-  'Сообщения человека приходят как <channel source="herald" kind="..." item_id="...">:',
+];
+
+const STATUS_AND_TITLE = [
+  'status — короткий статус сессии на границах задач (в Telegram не отправляется, человек видит его по /status).',
+  '',
+  'title — название сессии в шапке её сообщений (например, «dmg-ui · Ф4»): по нему человек отличает параллельные окна одного проекта. Задай его в начале работы и обнови, когда сессия переходит к другой задаче.',
+];
+
+/** Инструкции с событиями: сообщения человека приходят в сессию сами. */
+const EVENTS_INSTRUCTIONS = [
+  ...COMMON,
+  'Канал подключён: сообщения человека приходят как <channel source="herald" kind="..." item_id="...">:',
   '- kind="directive" — указание человека этой сессии; выполни его как просьбу пользователя.',
   '- kind="answer" question_id="..." — ответ на твой вопрос (option — id выбранного варианта).',
   '- kind="late-answer" question_id="..." — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
   '',
-  'ask задаёт вопрос с вариантами и сразу возвращает id — не жди, продолжай работу; ответ придёт событием. Если ответа долго нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). status — короткий статус сессии на границах задач (в Telegram не отправляется, человек видит его по /status).',
-  '',
-  'title — название сессии в шапке её сообщений (например, «dmg-ui · Ф4»): по нему человек отличает параллельные окна одного проекта. Задай его в начале работы и обнови, когда сессия переходит к другой задаче.',
+  'ask задаёт вопрос с вариантами и сразу возвращает id — не жди, продолжай работу; ответ придёт событием. Если ответа долго нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»).',
+  ...STATUS_AND_TITLE,
 ].join('\n');
+
+/** Инструкции без событий: Claude Code запущен без флага канала, входящие агент забирает сам. */
+const PULL_INSTRUCTIONS = [
+  ...COMMON,
+  'Канал не подключён: Claude Code запущен без `--dangerously-load-development-channels server:herald`, сообщения человека в сессию сами не приходят. Забирай их инструментом inbox — на границе каждой задачи и когда ждёшь ответа на ask (inbox с wait_seconds, до 600):',
+  '- kind=directive — указание человека этой сессии; выполни его как просьбу пользователя.',
+  '- kind=answer question_id=... — ответ на твой вопрос (option — id выбранного варианта).',
+  '- kind=late-answer question_id=... — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
+  '',
+  'ask задаёт вопрос с вариантами и сразу возвращает id; ответ забери инструментом inbox. Если ответа долго нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»).',
+  ...STATUS_AND_TITLE,
+].join('\n');
+
+/** Что агент забирает инструментом `inbox`; команды терминала берёт цикл. */
+const PULL_KINDS: readonly InboxKind[] = ['directive', 'answer', 'late-answer'];
 
 const TOOLS = [
   {
@@ -129,6 +163,13 @@ const TOOLS = [
   },
 ];
 
+const INBOX_TOOL = {
+  name: 'inbox',
+  description:
+    'Забрать сообщения человека из Telegram: указания, ответы на вопросы, переигрывания. Забранные считаются прочитанными. wait_seconds — ждать первых, если пока пусто (до 600).',
+  inputSchema: { type: 'object', properties: { wait_seconds: { type: 'number' } } },
+};
+
 /**
  * Канал herald для Claude Code: MCP-сервер с capability `claude/channel`, инструменты поверх клиента herald
  * и цикл входящих → `notifications/claude/channel` → подтверждение прочтения.
@@ -143,11 +184,16 @@ export class HeraldChannel {
   private loop: Promise<void> | undefined;
   /** Вопросы-подтверждения: id вопроса → request_id; решённые остаются с `undefined` (поздние ответы — не события). */
   private readonly permissions = new Map<string, string | undefined>();
+  private readonly events: boolean;
   static readonly PREVIEW_MAX = 1_000;
+  static readonly INBOX_WAIT_MAX_S = 600;
 
   constructor(private readonly options: HeraldChannelOptions) {
     this.herald = options.herald;
     this.log = options.log ?? ((m) => process.stderr.write(`${m}\n`));
+    this.events = options.events ?? true;
+    // Подтверждение действий идёт только через события канала.
+    const permissionRelay = this.events && options.permissionRelay === true;
     this.server = new Server(
       { name: 'herald', version: '0.1.0' },
       {
@@ -155,13 +201,13 @@ export class HeraldChannel {
           tools: {},
           experimental: {
             'claude/channel': {},
-            ...(options.permissionRelay && { 'claude/channel/permission': {} }),
+            ...(permissionRelay && { 'claude/channel/permission': {} }),
           },
         },
-        instructions: INSTRUCTIONS,
+        instructions: this.events ? EVENTS_INSTRUCTIONS : PULL_INSTRUCTIONS,
       },
     );
-    if (options.permissionRelay) {
+    if (permissionRelay) {
       // Схемы zod у этого уведомления нет — ловим его в fallback.
       this.server.fallbackNotificationHandler = async (n) => {
         if (n.method === 'notifications/claude/channel/permission_request') {
@@ -169,7 +215,9 @@ export class HeraldChannel {
         }
       };
     }
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: this.events ? TOOLS : [...TOOLS, INBOX_TOOL],
+    }));
     this.server.setRequestHandler(CallToolRequestSchema, async (req) =>
       this.callTool(req.params.name, (req.params.arguments ?? {}) as Record<string, unknown>),
     );
@@ -189,6 +237,18 @@ export class HeraldChannel {
     if (this.loop) return;
     this.running = true;
     this.loop = this.run();
+    if (!this.events && !this.options.silent) void this.warnNoEvents();
+  }
+
+  /** Человек узнаёт сразу, что указания этому окну не придут мгновенно. */
+  private async warnNoEvents(): Promise<void> {
+    try {
+      await this.herald.notify(
+        '⚠️ Окно запущено без канала: указания и ответы сессия заберёт сама (инструмент inbox), не сразу. Чтобы приходили сразу — запуск с `--dangerously-load-development-channels server:herald`.',
+      );
+    } catch (error) {
+      this.log(`herald channel: предупреждение — ${HeraldChannel.message(error)}`);
+    }
   }
 
   /**
@@ -214,7 +274,7 @@ export class HeraldChannel {
   private async run(): Promise<void> {
     while (this.running) {
       try {
-        const items = await this.herald.inbox(this.options.inboxWaitMs ?? 50_000);
+        const items = await this.herald.inbox(this.options.inboxWaitMs ?? 50_000, this.events ? [] : ['command']);
         if (!this.running) return;
         for (const item of items) {
           if (item.questionId !== undefined && this.permissions.has(item.questionId)) await this.permit(item);
@@ -269,19 +329,45 @@ export class HeraldChannel {
   }
 
   private async deliver(item: InboxItemWire): Promise<void> {
-    const content =
-      item.kind === 'answer'
-        ? `Ответ на вопрос ${item.questionId}: ${item.text}`
-        : item.kind === 'late-answer'
-          ? `Переигрывание вопроса ${item.questionId}: ${item.text}`
-          : item.text;
-    const meta: Record<string, string> = {
+    await this.server.notification({
+      method: 'notifications/claude/channel',
+      params: { content: HeraldChannel.content(item), meta: HeraldChannel.meta(item) },
+    });
+  }
+
+  /** Инструмент `inbox`: входящие текстом, затем подтверждение прочтения. */
+  private async pull(args: Record<string, unknown>): Promise<ToolResult> {
+    const wait = args.wait_seconds;
+    if (wait !== undefined && (typeof wait !== 'number' || !Number.isFinite(wait) || wait < 0))
+      throw new ToolArgsError('аргумент «wait_seconds» — ожидается число ≥ 0');
+    const waitMs = Math.min(wait ?? 0, HeraldChannel.INBOX_WAIT_MAX_S) * 1_000;
+    const items = await this.herald.inbox(waitMs, PULL_KINDS);
+    if (items.length === 0) return HeraldChannel.ok('входящих нет');
+    await this.herald.ack(items.map((i) => i.id));
+    const text = items.map((item) => {
+      const header = Object.entries(HeraldChannel.meta(item))
+        .map(([k, v]) => `${k}=${v}`)
+        .join(' ');
+      return `${header}\n${HeraldChannel.content(item)}`;
+    });
+    return HeraldChannel.ok(text.join('\n\n'));
+  }
+
+  private static content(item: InboxItemWire): string {
+    return item.kind === 'answer'
+      ? `Ответ на вопрос ${item.questionId}: ${item.text}`
+      : item.kind === 'late-answer'
+        ? `Переигрывание вопроса ${item.questionId}: ${item.text}`
+        : item.text;
+  }
+
+  private static meta(item: InboxItemWire): Record<string, string> {
+    return {
       kind: item.kind,
       item_id: item.id,
       ...(item.questionId !== undefined && { question_id: item.questionId }),
       ...(item.option !== undefined && { option: item.option }),
     };
-    await this.server.notification({ method: 'notifications/claude/channel', params: { content, meta } });
   }
 
   private async callTool(name: string, args: Record<string, unknown>): Promise<ToolResult> {
@@ -305,7 +391,9 @@ export class HeraldChannel {
             ...(recommended !== undefined && { recommended }),
           });
           return HeraldChannel.ok(
-            `вопрос ${question.id} задан; ответ придёт событием <channel kind="answer" question_id="${question.id}">`,
+            this.events
+              ? `вопрос ${question.id} задан; ответ придёт событием <channel kind="answer" question_id="${question.id}">`
+              : `вопрос ${question.id} задан; ответ забери инструментом inbox (kind=answer question_id=${question.id})`,
           );
         }
         case 'decide': {
@@ -320,6 +408,10 @@ export class HeraldChannel {
           );
           return HeraldChannel.ok(`решение по вопросу ${question.id} принято`);
         }
+        case 'inbox':
+          if (this.events)
+            throw new ToolArgsError('нет инструмента inbox: канал подключён, входящие приходят событиями');
+          return await this.pull(args);
         default:
           throw new ToolArgsError(`нет инструмента ${name}`);
       }

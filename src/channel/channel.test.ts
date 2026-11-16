@@ -10,7 +10,9 @@ afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
 
-async function setup(options: { permissionRelay?: boolean; terminal?: Terminal } = {}) {
+async function setup(
+  options: { permissionRelay?: boolean; terminal?: Terminal; events?: boolean; silent?: boolean } = {},
+) {
   const herald = new FakeHerald();
   const logs: string[] = [];
   const channel = new HeraldChannel({ herald, log: (m) => logs.push(m), retryDelayMs: 5, ...options });
@@ -298,5 +300,82 @@ describe('HeraldChannel — подтверждение действий из Tel
     herald.failNext('бот заблокирован');
     await relay(client);
     await until(() => logs.some((l) => l.includes('бот заблокирован')));
+  });
+});
+
+describe('HeraldChannel — без событий (Claude Code запущен без флага канала)', () => {
+  test('по умолчанию события есть: инструкции говорят, что канал подключён; инструмента inbox нет', async () => {
+    const { client } = await setup();
+    expect(client.getInstructions()).toContain('Канал подключён');
+    expect((await client.listTools()).tools.map((t) => t.name)).not.toContain('inbox');
+  });
+
+  test('инструкции — «канал не подключён», есть инструмент inbox; подтверждения действий нет', async () => {
+    const { client } = await setup({ events: false, permissionRelay: true });
+    expect(client.getInstructions()).toContain('Канал не подключён');
+    expect(client.getInstructions()).toContain('inbox');
+    expect((await client.listTools()).tools.map((t) => t.name)).toContain('inbox');
+    expect(client.getServerCapabilities()?.experimental?.['claude/channel/permission']).toBeUndefined();
+  });
+
+  test('цикл берёт только команды; указания ждут в ящике, событий и прочтения нет', async () => {
+    const sent: string[] = [];
+    const { herald, channel, events, until } = await setup({
+      events: false,
+      silent: true,
+      terminal: { send: async (c) => void sent.push(c) },
+    });
+    channel.start();
+    herald.push(
+      { id: 'i_1', kind: 'directive', text: 'дальше', createdAt: 1 },
+      { id: 'i_2', kind: 'command', text: '/compact', createdAt: 2 },
+    );
+    await until(() => herald.acked.length === 1);
+    expect(herald.lastKinds).toEqual(['command']);
+    expect(sent).toEqual(['/compact']);
+    expect(herald.acked).toEqual(['i_2']);
+    await Bun.sleep(30);
+    expect(events).toEqual([]);
+    expect(herald.acked).toEqual(['i_2']);
+  });
+
+  test('inbox — указания и ответы текстом с id, затем прочтение; команд не берёт', async () => {
+    const { herald, call } = await setup({ events: false, silent: true });
+    herald.push(
+      { id: 'i_1', kind: 'directive', text: 'Займись тестами', createdAt: 1 },
+      { id: 'i_2', kind: 'answer', text: 'B: Postgres', questionId: 'q_1', option: 'B', createdAt: 2 },
+    );
+    const r = await call('inbox', { wait_seconds: 5 });
+    expect(r.isError).toBe(false);
+    expect(r.text).toContain('kind=directive item_id=i_1');
+    expect(r.text).toContain('Займись тестами');
+    expect(r.text).toContain('kind=answer item_id=i_2 question_id=q_1 option=B');
+    expect(r.text).toContain('Ответ на вопрос q_1: B: Postgres');
+    expect(herald.lastKinds).toEqual(['directive', 'answer', 'late-answer']);
+    expect(herald.acked).toEqual(['i_1', 'i_2']);
+    expect((await call('inbox', {})).text).toContain('входящих нет');
+    expect((await call('inbox', { wait_seconds: 'x' })).isError).toBe(true);
+  });
+
+  test('ask — ответ забирать инструментом inbox', async () => {
+    const { call } = await setup({ events: false, silent: true });
+    expect((await call('ask', { text: 'Какую БД?' })).text).toContain('inbox');
+  });
+
+  test('при старте — предупреждение человеку; silent (claude -p) — без него', async () => {
+    const loud = await setup({ events: false });
+    loud.channel.start();
+    await loud.until(() => loud.herald.notified.length === 1);
+    expect(loud.herald.notified[0]).toContain('без канала');
+
+    const quiet = await setup({ events: false, silent: true });
+    quiet.channel.start();
+    await Bun.sleep(30);
+    expect(quiet.herald.notified).toEqual([]);
+
+    const normal = await setup();
+    normal.channel.start();
+    await Bun.sleep(30);
+    expect(normal.herald.notified).toEqual([]);
   });
 });

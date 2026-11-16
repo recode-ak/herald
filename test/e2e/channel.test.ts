@@ -29,6 +29,8 @@ function env(extra: Record<string, string> = {}): Record<string, string> {
     HERALD_TOKEN: 't-nur',
     HERALD_HOST: 'laptop',
     HERALD_SESSION: 'claude',
+    // Родитель — bun test, а не Claude Code с флагом канала.
+    HERALD_CHANNEL_EVENTS: '1',
     ...extra,
   };
 }

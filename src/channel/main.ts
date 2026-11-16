@@ -7,6 +7,7 @@ import { SessionLocator } from '../client/locator.ts';
 import { Session } from '../domain/session.ts';
 import { SystemClock } from '../infra/system.ts';
 import { HeraldChannel } from './channel.ts';
+import { ClaudeLaunch } from './launch.ts';
 import { TmuxTerminal } from './tmux.ts';
 
 const log = (message: string) => process.stderr.write(`${message}\n`);
@@ -30,11 +31,17 @@ const herald = new HeraldClient({
   session,
   clock: new SystemClock(),
 });
+// Родитель — Claude Code: по его флагам видно, примет ли он события (или HERALD_CHANNEL_EVENTS). Не узнали — считаем, что примет.
+const launch = await new ClaudeLaunch().of(process.ppid, process.env);
+if (!launch) log('herald channel: не удалось прочитать аргументы Claude Code — считаю, что канал подключён');
+const events = launch?.events ?? true;
 const channel = new HeraldChannel({
   herald,
   log,
   terminal: TmuxTerminal.fromEnv(process.env),
   permissionRelay: process.env.HERALD_PERMISSION_RELAY === '1',
+  events,
+  silent: launch?.print ?? false,
 });
 // Claude Code закрыл канал или процесс останавливают — herald узнаёт, что окно закрыто (сессия ⚪).
 const exit = () => void channel.close().finally(() => process.exit(0));
@@ -43,4 +50,6 @@ process.on('SIGTERM', exit);
 process.on('SIGINT', exit);
 await channel.connect(new StdioServerTransport());
 channel.start();
-log(`herald channel: сессия ${Session.keyOf(session)} → ${config.serverUrl}`);
+log(
+  `herald channel: сессия ${Session.keyOf(session)} → ${config.serverUrl}${events ? '' : ' (без событий: нет флага канала)'}`,
+);

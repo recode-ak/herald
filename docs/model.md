@@ -149,17 +149,23 @@ Telegram опрашивается long polling `getUpdates` (25 с); offset хр
 
 ## Канал (`src/channel`)
 
-MCP-сервер по stdio для Claude Code — тонкий слой над тем же клиентом, что у CLI. Capability `experimental: { 'claude/channel': {} }` (и `'claude/channel/permission'` при `HERALD_PERMISSION_RELAY=1`). Подключение — `docs/install.md`.
+MCP-сервер по stdio для Claude Code — тонкий слой над тем же клиентом, что у CLI. Capability `experimental: { 'claude/channel': {} }` (и `'claude/channel/permission'` при `HERALD_PERMISSION_RELAY=1` в режиме событий). Подключение — `docs/install.md`.
+
+**Режим** — по флагам родителя (Claude Code): `/proc/<ppid>/cmdline`, иначе `ps -o args=`. Изнутри MCP его не узнать: рукопожатие с флагом и без одинаковое, а события без флага Claude Code молча отбрасывает.
+- **События** — есть `--dangerously-load-development-channels server:herald` (значения через пробел или запятую, `=`-форма). `--channels server:herald` не считается: несогласованный сервер Claude Code отбрасывает.
+- **Без событий** — флага нет. Инструкции сервера говорят «Канал не подключён», появляется инструмент `inbox`, цикл входящих берёт только `command` (пульс и `/clear`, `/compact` остаются), указания и ответы ждут в ящике, пока агент их не заберёт. При старте человеку уведомление «⚠️ Окно запущено без канала…» (не у `claude -p`). Подтверждения действий нет.
+- `HERALD_CHANNEL_EVENTS=1|0` задаёт режим явно; аргументы не прочитать — режим событий (как раньше).
 
 | Инструмент | Аргументы | Результат |
 |---|---|---|
 | `reply`, `notify` | `text` | уведомление человеку |
-| `ask` | `text`, `options?: [{ id, text }]`, `recommended?` | сразу id вопроса; ответ — событием |
+| `ask` | `text`, `options?: [{ id, text }]`, `recommended?` | сразу id вопроса; ответ — событием (без событий — через `inbox`) |
 | `decide` | `question_id`, `option` или `text`, `reason` | решение агента |
 | `status` | `text` | статус сессии (в Telegram не отправляется) |
 | `title` | `text` | название сессии в шапке; инструкция канала просит задать его в начале работы |
+| `inbox` | `wait_seconds?` (до 600) | только без событий: непрочитанные `directive`, `answer`, `late-answer` текстом (`kind=… item_id=… question_id=… option=…`, ниже — `content` как в событии), затем `ack`; пусто — ждёт до `wait_seconds` |
 
-Входящие: цикл long poll `inbox` → `notifications/claude/channel` `{ content, meta }` → `ack` (подтверждение прочтения — после доставки; сбой — повтор, событие может прийти дважды). Закрытие (Claude Code закрыл stdio, SIGTERM/SIGINT) — `bye` (best effort), затем выход; без него сессия станет ⚪ через 2 мин.
+Входящие (режим событий): цикл long poll `inbox` → `notifications/claude/channel` `{ content, meta }` → `ack` (подтверждение прочтения — после доставки; сбой — повтор, событие может прийти дважды). Закрытие (Claude Code закрыл stdio, SIGTERM/SIGINT) — `bye` (best effort), затем выход; без него сессия станет ⚪ через 2 мин.
 
 Команда (`command`) событием не идёт: канал набирает её в панели tmux окна (`TMUX_PANE`, наследуется от Claude Code) — `Ctrl+U` (очистить черновик; вернуть — `Ctrl+Y`), команда, `Enter`. Агент занят — Claude Code ставит команду в очередь и выполняет после хода. Окно не в tmux или сбой tmux — человеку уведомление «⚠️ <команда> не выполнена: …». После `/clear` процесс канала тот же — сессия и её ключ не меняются.
 

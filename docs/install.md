@@ -65,9 +65,22 @@ claude mcp add --scope user herald -- bun ~/dev/tools/herald/src/channel/main.ts
 claude --dangerously-load-development-channels server:herald
 ```
 
-Без флага сервер работает как обычный MCP: инструменты есть, но сообщения из Telegram в сессию не приходят — их можно забрать `herald inbox`.
+Без флага Claude Code молча отбрасывает события канала. Канал видит это по аргументам Claude Code и переходит в режим без событий: указания и ответы ждут в ящике, агент забирает их инструментом `inbox`, в Telegram при старте приходит «⚠️ Окно запущено без канала…». Подробно — `docs/model.md` «Канал».
 
-**3. Разрешить инструменты без вопросов** (по желанию) — в `permissions.allow` настроек Claude Code: `mcp__herald__reply`, `mcp__herald__notify`, `mcp__herald__ask`, `mcp__herald__decide`, `mcp__herald__status`.
+Чтобы не набирать флаг, — функция в `~/.bashrc` (подкоманды и `-p` — без флага):
+
+```sh
+claude() {
+  case "$1" in
+    mcp|config|plugin|plugins|update|doctor|install|setup-token|-p|--print|-v|--version|-h|--help) command claude "$@" ;;
+    *) command claude --dangerously-load-development-channels server:herald "$@" ;;
+  esac
+}
+```
+
+С флагом Claude Code при каждом запуске спрашивает подтверждение dev-канала — один Enter. Включить канал в настройках нельзя: только флагом (2.1.325).
+
+**3. Разрешить инструменты без вопросов** (по желанию) — в `permissions.allow` настроек Claude Code: `mcp__herald__reply`, `mcp__herald__notify`, `mcp__herald__ask`, `mcp__herald__decide`, `mcp__herald__status`, `mcp__herald__title`, `mcp__herald__inbox`.
 
 ### Переменные окружения канала
 
@@ -78,6 +91,7 @@ claude --dangerously-load-development-channels server:herald
 | `HERALD_SESSION` | явное имя сессии вместо корня git (`[host · имя]`) |
 | `CLAUDE_CODE_SESSION_ID` | ставит Claude Code: окно сессии (`[host · проект·02dc]`), см. `docs/model.md` «CLI» |
 | `TMUX_PANE` | ставит tmux: панель окна, куда канал набирает `/clear` и `/compact` из Telegram. Claude Code не в tmux — эти команды не выполняются |
+| `HERALD_CHANNEL_EVENTS=1\|0` | режим явно: `1` — события, `0` — без событий (по умолчанию — по флагам Claude Code) |
 | `HERALD_PERMISSION_RELAY=1` | подтверждение действий Claude Code из Telegram: запрос разрешения приходит вопросом «Разрешить / Запретить». По умолчанию выключено |
 | `HERALD_URL`, `HERALD_TOKEN`, `HERALD_HOST`, `HERALD_CONFIG` | переопределить настройки клиента |
 
@@ -86,6 +100,7 @@ claude --dangerously-load-development-channels server:herald
 - Протокол Channels может измениться — тогда правится только `src/channel` (CLI и сервер не затронуты).
 - Сессия определяется по каталогу запуска Claude Code (корень git) — тот же ключ, что у `herald` в этом каталоге: CLI и канал делят входящие одной сессии.
 - Событие приходит на ближайшем шаге агента; если сессия простаивает, оно ждёт следующего хода. Запасной путь — `herald inbox`.
+- Claude Code уже предлагает серверу новую ревизию MCP (`server/discover`); на ней события канала он отключает («no unsolicited notification path»). Пока SDK отвечает на старой ревизии — работает; при обновлении SDK проверить.
 - Вопросы-подтверждения живут в процессе канала: после перезапуска Claude Code ответ на старый запрос придёт обычным событием `answer`.
 - Логи канала — только в stderr (stdout занят MCP).
 
