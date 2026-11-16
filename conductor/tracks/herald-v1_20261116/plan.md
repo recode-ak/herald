@@ -18,9 +18,9 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Вопрос (ba1daf3)
     - [x] Тесты: варианты и рекомендованный (рекомендованный — из вариантов), состояния `open → answered | decided`, ответ после `decided` или повторный — поздний (`lateAnswers`), `decide` только из `open` и без удержания «Жди меня» (`hold`)
     - [x] Реализация `src/domain/question`
-- [ ] Task: Входящие
-    - [ ] Тесты: виды `answer`, `late-answer`, `directive`; состояния `queued → read`; порядок выдачи; принадлежность сессии
-    - [ ] Реализация `src/domain/inbox`
+- [x] Task: Входящие (377e0cf)
+    - [x] Тесты: виды `answer`, `late-answer`, `directive`; состояния `queued → read`; порядок выдачи; принадлежность сессии
+    - [x] Реализация `src/domain/inbox`
 - [ ] Task: `docs/model.md` — сущности, состояния, правила
 - [ ] Task: Conductor - User Manual Verification 'Фаза 1: Каркас и домен' (Protocol in workflow.md)
 
