@@ -18,7 +18,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 Критерии фазы: требования 18–19 покрыты тестами; документы обновлены; сервер выкачен, ручная проверка пройдена.
 
 - [x] Task: Клиент и CLI — пачка в `ask`, `--answers`, `herald to-terminal` (934b4be)
-- [ ] Task: Канал — `ask`/`decide`/`answered` с пачкой, `to_terminal`, событие `to-terminal`, инструкции
+- [x] Task: Канал — `ask`/`decide`/`answered` с пачкой, `to_terminal`, событие `to-terminal`, инструкции (c5f11d5)
 - [ ] Task: Мост pi — доставка `to-terminal`
 - [ ] Task: Документы — `docs/model.md`, `docs/install.md`
 - [ ] Task: Выкатка и ручная проверка на проде
