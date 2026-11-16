@@ -1,0 +1,1 @@
+Задача 5 трека question-group: src/http/body.ts (optionalItems, optionalAnswers, optionalChoice), api.ts (маршруты), src/app/agent.ts (toTerminal, awaitQuestion возвращает переведённый). Причина — spec п. 15–17.
