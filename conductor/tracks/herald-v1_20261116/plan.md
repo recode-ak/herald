@@ -67,8 +67,8 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Команды `notify`, `ask`, `decide`, `status`, `inbox` (cd17852)
     - [x] Тесты: аргументы, JSON-вывод, коды выхода (ответ / таймаут / ошибка), `ask` без `--timeout` ждёт бесконечно
     - [x] Реализация `src/cli`, `bun run link`
-- [~] Task: Сквозной тест `test/e2e/` — КП 1–5, 7 для CLI
-- [ ] Task: `docs/model.md` — команды CLI
+- [x] Task: Сквозной тест `test/e2e/` — КП 1–5, 7 для CLI (693a7a6)
+- [~] Task: `docs/model.md` — команды CLI
 - [ ] Task: Conductor - User Manual Verification 'Фаза 4: CLI' (Protocol in workflow.md)
 
 ## Фаза 5: Channel для Claude Code
