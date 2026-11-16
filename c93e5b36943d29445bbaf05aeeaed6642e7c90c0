@@ -1,0 +1,1 @@
+Задача: команда purge. src/server/purge-command.ts — PurgeCommand.parse (--days, --dry-run, HERALD_RETENTION_DAYS, HERALD_DB) и run(now) → JSON {cutoff, days, dryRun, deleted, remaining, dbBytes}; нет файла базы — ошибка, файл не создаётся. src/server/purge.ts — точка входа: код 0 / 1 + stderr. package.json — скрипт purge. Тесты: разбор, запуск на временной базе, процесс.
