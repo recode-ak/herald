@@ -3,6 +3,7 @@ import { type Caller, ForbiddenError, NotFoundError } from '../app/ports.ts';
 import { TelegramError } from '../app/telegram.ts';
 import type { Access } from '../domain/access.ts';
 import { DomainError } from '../domain/errors.ts';
+import { InboxItem } from '../domain/inbox.ts';
 import type { Choice } from '../domain/question.ts';
 import { BadRequestError, RequestBody } from './body.ts';
 import { Wire } from './wire.ts';
@@ -65,7 +66,13 @@ export class HttpApi {
       ['/v1/status', (c, b) => agent.status(c, b.string('text'))],
       ['/v1/title', (c, b) => agent.title(c, b.string('text'))],
       ['/v1/bye', (c) => agent.bye(c)],
-      ['/v1/inbox', async (c, b) => ({ items: (await agent.awaitInbox(c, this.wait(b))).map(Wire.inboxItem) })],
+      [
+        '/v1/inbox',
+        async (c, b) => {
+          const kinds = InboxItem.kinds(b.optionalStrings('kinds'));
+          return { items: (await agent.awaitInbox(c, this.wait(b), kinds)).map(Wire.inboxItem) };
+        },
+      ],
       ['/v1/ack', async (c, b) => ({ read: await agent.ack(c, b.strings('ids')) })],
     ]);
   }

@@ -33,6 +33,17 @@ export class InboxItem {
     return InboxItem.COMMANDS.includes(text);
   }
 
+  static readonly KINDS: readonly InboxKind[] = ['answer', 'late-answer', 'directive', 'command'];
+
+  /** Виды из запроса агента; неизвестный — ошибка. */
+  static kinds(values: readonly string[]): InboxKind[] {
+    return values.map((value) => {
+      const kind = InboxItem.KINDS.find((k) => k === value);
+      if (!kind) throw new DomainError(`нет вида входящих «${value}»`);
+      return kind;
+    });
+  }
+
   static create(draft: InboxDraft, now: number): InboxItem {
     const text = draft.text.trim();
     if (!text) throw new DomainError('текст входящего пуст');
@@ -100,9 +111,10 @@ export class Inbox {
     this.items = new Map(items.map((i) => [i.id, i]));
   }
 
-  pending(): InboxItem[] {
+  /** Непрочитанные; `kinds` — только этих видов (пусто — все). */
+  pending(kinds: readonly InboxKind[] = []): InboxItem[] {
     return [...this.items.values()]
-      .filter((i) => !i.isRead)
+      .filter((i) => !i.isRead && (kinds.length === 0 || kinds.includes(i.kind)))
       .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
   }
 

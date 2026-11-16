@@ -131,6 +131,15 @@ describe('HeraldClient', () => {
     expect(await c.inbox(60)).toEqual([]);
   });
 
+  test('inbox с видами — только они', async () => {
+    const k = setup();
+    const c = k.client();
+    await c.notify('Готово');
+    await k.reply('Займись тестами');
+    expect(await c.inbox(0, ['command'])).toEqual([]);
+    expect((await c.inbox(0, ['directive'])).map((i) => i.text)).toEqual(['Займись тестами']);
+  });
+
   test('ошибка сервера — HeraldClientError со статусом и текстом', async () => {
     const k = setup();
     const error = await k

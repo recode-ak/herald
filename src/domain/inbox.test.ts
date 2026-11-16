@@ -56,6 +56,18 @@ describe('Inbox — входящие одной сессии', () => {
     expect(inbox.pending().map((i) => i.id)).toEqual(['c', 'a', 'b']);
   });
 
+  test('непрочитанные — только указанных видов; пустой список — все', () => {
+    const answer = InboxItem.create({ ...base, id: 'q', kind: 'answer', text: 'A', questionId: 'q1' }, t0);
+    const inbox = new Inbox(base.sessionKey, [make('a', t0 + 1), answer]);
+    expect(inbox.pending(['directive', 'command']).map((i) => i.id)).toEqual(['a']);
+    expect(inbox.pending([]).map((i) => i.id)).toEqual(['q', 'a']);
+  });
+
+  test('виды из запроса: известные — как есть, неизвестный — ошибка', () => {
+    expect(InboxItem.kinds(['directive', 'late-answer'])).toEqual(['directive', 'late-answer']);
+    expect(() => InboxItem.kinds(['directive', 'спам'])).toThrow(DomainError);
+  });
+
   test('подтверждение прочтения возвращает только впервые прочитанные', () => {
     const items = [make('a', t0), make('b', t0 + 1)];
     const inbox = new Inbox(base.sessionKey, items);

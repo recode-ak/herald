@@ -1,4 +1,5 @@
 import type { Clock } from '../app/ports.ts';
+import type { InboxKind } from '../domain/inbox.ts';
 import type { Choice, QuestionOption } from '../domain/question.ts';
 import type { SessionRef } from '../domain/session.ts';
 import type { InboxItemWire, QuestionWire } from '../http/wire.ts';
@@ -82,11 +83,13 @@ export class HeraldClient {
     );
   }
 
-  /** Непрочитанные входящие; если их нет — ждать первых до `waitMs` (0 — не ждать). */
-  async inbox(waitMs = 0): Promise<InboxItemWire[]> {
+  /** Непрочитанные входящие (`kinds` — только этих видов); если их нет — ждать первых до `waitMs` (0 — не ждать). */
+  async inbox(waitMs = 0, kinds: readonly InboxKind[] = []): Promise<InboxItemWire[]> {
+    const filter = kinds.length > 0 ? { kinds } : {};
     return this.poll(
       waitMs,
-      async (chunk) => ((await this.call('/v1/inbox', { waitMs: chunk })) as { items: InboxItemWire[] }).items,
+      async (chunk) =>
+        ((await this.call('/v1/inbox', { waitMs: chunk, ...filter })) as { items: InboxItemWire[] }).items,
       (items) => items.length > 0,
     );
   }

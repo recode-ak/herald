@@ -234,6 +234,18 @@ describe('Статус и входящие', () => {
     expect(k.telegram.reactions.at(-1)).toMatchObject({ chatId: NUR_CHAT, emoji: '👀' });
   });
 
+  test('inbox с kinds — только эти виды; неизвестный вид — 400', async () => {
+    const k = setup();
+    await k.call('/v1/notify', { session, text: 'Готово' });
+    const notice = k.telegram.last(NUR_CHAT)!;
+    await k.reply('Займись тестами', notice.messageId);
+    expect((await k.call('/v1/inbox', { session, kinds: ['command'] })).json.items).toEqual([]);
+    const items = (await k.call('/v1/inbox', { session, kinds: ['directive'] })).json.items as InboxItemWire[];
+    expect(items.map((i) => i.kind)).toEqual(['directive']);
+    expect((await k.call('/v1/inbox', { session, kinds: ['спам'] })).status).toBe(400);
+    expect((await k.call('/v1/inbox', { session, kinds: 'directive' })).status).toBe(400);
+  });
+
   test('inbox по таймауту — пусто', async () => {
     const k = setup();
     const waiting = k.call('/v1/inbox', { session, waitMs: 1_000 });

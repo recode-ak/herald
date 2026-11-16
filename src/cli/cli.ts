@@ -160,7 +160,7 @@ export class Cli {
     const session = new SessionLocator(config.host).locate({
       cwd: this.deps.cwd,
       name: args.value('session') ?? this.deps.env.HERALD_SESSION,
-      agentSession: this.deps.env.CLAUDE_CODE_SESSION_ID,
+      agentSession: this.deps.env.CLAUDE_CODE_SESSION_ID ?? this.deps.env.PI_SESSION_ID,
     });
     return new HeraldClient({ serverUrl: config.serverUrl, token: config.token, session, clock: this.deps.clock });
   }

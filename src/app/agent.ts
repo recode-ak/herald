@@ -1,6 +1,6 @@
 import type { Access } from '../domain/access.ts';
 import { DomainError } from '../domain/errors.ts';
-import type { InboxItem } from '../domain/inbox.ts';
+import type { InboxItem, InboxKind } from '../domain/inbox.ts';
 import { type Choice, Question, type QuestionOption } from '../domain/question.ts';
 import { Session } from '../domain/session.ts';
 import { Messages } from './messages.ts';
@@ -164,12 +164,15 @@ export class AgentService {
     }
   }
 
-  /** Ждать входящих до `timeoutMs`: непрочитанные сразу, иначе — первые пришедшие; по таймауту — пусто. */
-  async awaitInbox(caller: Caller, timeoutMs: number): Promise<InboxItem[]> {
+  /**
+   * Ждать входящих до `timeoutMs`: непрочитанные сразу, иначе — первые пришедшие; по таймауту — пусто.
+   * `kinds` — только этих видов (пусто — все): расширение pi не берёт ответы, их ждёт `herald ask`.
+   */
+  async awaitInbox(caller: Caller, timeoutMs: number, kinds: readonly InboxKind[] = []): Promise<InboxItem[]> {
     const session = this.enter(caller);
     const deadline = this.deps.clock.now() + timeoutMs;
     for (;;) {
-      const pending = this.deps.store.inbox(session.key).pending();
+      const pending = this.deps.store.inbox(session.key).pending(kinds);
       if (pending.length > 0) return pending;
       if (!(await this.deps.waiter.wait(Waiter.sessionTopic(session.key), deadline - this.deps.clock.now()))) {
         return [];

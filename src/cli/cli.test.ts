@@ -115,6 +115,13 @@ describe('herald notify / status', () => {
     expect(k.telegram.last(NUR_CHAT)?.text).toBe(`[laptop · ${project}·02dc · ревью Ф4]\nx`);
   });
 
+  test('PI_SESSION_ID (bash pi) — окно сессии, как у Claude Code', async () => {
+    const k = setup();
+    await k.run(['notify', 'x'], { PI_SESSION_ID: '019a7c3e-55aa' });
+    const project = k.cwd.split('/').at(-1);
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe(`[laptop · ${project}·019a]\nx`);
+  });
+
   test('status — без отправки в Telegram', async () => {
     const k = setup();
     expect((await k.run(['status', 'Фаза 4: CLI'])).code).toBe(0);

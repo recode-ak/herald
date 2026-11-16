@@ -49,6 +49,11 @@ export class RequestBody {
     return value;
   }
 
+  /** Массив строк; нет поля — пусто. */
+  optionalStrings(name: string): string[] {
+    return this.data[name] === undefined ? [] : this.strings(name);
+  }
+
   options(name = 'options'): QuestionOption[] {
     const value = this.data[name];
     if (value === undefined) return [];

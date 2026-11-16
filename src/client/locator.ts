@@ -1,8 +1,10 @@
+import { spawnSync } from 'node:child_process';
 import type { SessionRef } from '../domain/session.ts';
 
 /**
  * Где работает агент: host из настроек, корень git-репо текущего каталога (вне git — сам каталог), явное имя.
- * `agentSession` — id сессии агента (`CLAUDE_CODE_SESSION_ID`): параллельные окна в одном корне — разные сессии.
+ * `agentSession` — id сессии агента (`CLAUDE_CODE_SESSION_ID`, `PI_SESSION_ID`): параллельные окна в одном корне — разные сессии.
+ * Только API Node: локатор работает и в расширении pi (Node).
  */
 export class SessionLocator {
   /** Сколько символов id сессии агента идёт в метку окна. */
@@ -19,8 +21,12 @@ export class SessionLocator {
   }
 
   private static gitRoot(cwd: string): string | undefined {
-    const result = Bun.spawnSync(['git', 'rev-parse', '--show-toplevel'], { cwd, stdout: 'pipe', stderr: 'ignore' });
-    if (result.exitCode !== 0) return undefined;
-    return result.stdout.toString().trim() || undefined;
+    const result = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    if (result.status !== 0) return undefined;
+    return result.stdout.trim() || undefined;
   }
 }

@@ -118,6 +118,20 @@ describe('Ожидание входящих', () => {
     expect((await waiting).map((i) => i.kind)).toEqual(['late-answer']);
   });
 
+  test('фильтр видов: ответ не будит и не выдаётся, указание — да', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    const notice = k.telegram.last(NUR_CHAT)!;
+    const q = await k.agent.ask(nur, db);
+    const qMsg = k.telegram.last(NUR_CHAT)!;
+    const waiting = k.agent.awaitInbox(nur, 60_000, ['directive']);
+    await k.press(qMsg.messageId, `a:${q.id}:A`);
+    expect(k.clock.sleepers).toBe(1);
+    await k.reply('стоп', notice.messageId);
+    const items = await waiting;
+    expect(items.map((i) => i.kind)).toEqual(['directive']);
+  });
+
   test('таймаут — пусто', async () => {
     const k = setup();
     const waiting = k.agent.awaitInbox(nur, 5000);
