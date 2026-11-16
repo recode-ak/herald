@@ -10,7 +10,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Миграция v5 — `message_links.created_at` (bc08fa1)
 - [x] Task: `Store.purge(cutoff, { dryRun })` — правила политики, счётчики удалённого и оставшегося (7ba357c)
 - [x] Task: Команда `bun run purge` — аргументы, `HERALD_RETENTION_DAYS`, JSON, коды выхода (c93e5b3)
-- [ ] Task: Бот — кнопка на удалённом вопросе: «вопрос устарел и удалён»
+- [x] Task: Бот — кнопка на удалённом вопросе: «вопрос устарел и удалён» (23f0480)
 - [ ] Task: Документы — `docs/model.md` «Хранение», `docs/deploy.md`, `docs/install.md`
 - [ ] Task: Conductor - User Manual Verification 'Фаза 1: Очистка в herald' (Protocol in workflow.md)
 
