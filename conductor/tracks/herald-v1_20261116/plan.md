@@ -54,7 +54,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Адаптер Telegram Bot API (`fetch`) (b4fd511)
     - [x] Тесты против локального фейка Bot API: `getUpdates` long polling с сохранением offset, `sendMessage` с inline-кнопками, `editMessageText`, `answerCallbackQuery`, ошибки и повторы
     - [x] Реализация `src/infra/telegram`
-- [~] Task: Точка входа сервера — конфиг из `.env`, сборка, корректная остановка; `docs/model.md` — HTTP API
+- [x] Task: Точка входа сервера — конфиг из `.env`, сборка, корректная остановка; `docs/model.md` — HTTP API (2c68fa8)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 3: HTTP-сервер и Telegram-адаптер' (Protocol in workflow.md)
 
 ## Фаза 4: CLI
