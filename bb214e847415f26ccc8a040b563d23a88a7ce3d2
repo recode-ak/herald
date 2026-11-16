@@ -1,0 +1,1 @@
+Задача: документы. docs/model.md — раздел «Хранение» (политика, команда, вывод), HERALD_RETENTION_DAYS в таблице сервера; docs/deploy.md — строка «Очистка» (служба server-ops herald-retention), миграции при старте; docs/install.md — cron для очистки на других установках.
