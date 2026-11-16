@@ -102,7 +102,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] Нурболат (sudo): nginx + certbot временным скриптом — `https://herald.u7-hub.kz/health` ok, http → 301
     - [x] Мониторинг: `HEALTH_INTERNAL_SERVICES` += `4518:herald` (согласие Нурболата; только «жив»)
     - [x] Бэкап не нужен (решение Нурболата 2026-11-16): `backup.contract`, `scripts/backup.sh` и снимок pre-deploy удалены, `db-backups/` на сервере удалён
-- [x] Task: Смоук на реальном боте — КП 1–7, результат — в git note
+- [x] Task: Смоук на реальном боте — КП 1–7, результат — в git note (ded6c34)
     - [x] КП 1, 2, 3, 4, 5 и неверный токен (КП 7) — CLI с ноутбука через `https://herald.u7-hub.kz`, ответы Нурболата в Telegram
     - [ ] Чужой chat_id (КП 7) — Нурболат проверит со второго аккаунта позже; до того — тест `human.test.ts`
     - [ ] КП 6 (канал в живой сессии Claude Code) — перенесён в Фазу 7, после подключения канала
