@@ -103,34 +103,29 @@ describe('Ответы на вопрос', () => {
     await expect(k.agent.decide(nur, q.id, { option: 'A' }, 'по таймауту')).rejects.toThrow('просил ждать');
   });
 
-  test('«Жди меня» — только у открытого вопроса без удержания', async () => {
+  test('кнопки по состоянию: открыт — варианты и «Жди меня»; удержан или решён агентом — варианты; ответил человек — нет', async () => {
     const k = setup();
-    const hasHold = (messageId: number) =>
-      k.telegram
-        .message(NUR_CHAT, messageId)
-        ?.buttons?.flat()
-        .some((b) => b.data.startsWith('h:'));
+    const texts = (messageId: number) =>
+      (k.telegram.message(NUR_CHAT, messageId)?.buttons ?? []).flat().map((b) => b.text);
     const answered = await k.agent.ask(nur, db);
     const aMsg = k.telegram.last(NUR_CHAT)!.messageId;
     const decided = await k.agent.ask(nur, db);
     const dMsg = k.telegram.last(NUR_CHAT)!.messageId;
     const held = await k.agent.ask(nur, db);
     const hMsg = k.telegram.last(NUR_CHAT)!.messageId;
-    expect(hasHold(hMsg)).toBe(true);
+    expect(texts(hMsg)).toEqual(['A ⭐', 'B', 'Жди меня']);
 
     await k.press(NUR_CHAT, aMsg, `a:${answered.id}:B`);
     await k.agent.decide(nur, decided.id, { option: 'A' }, 'по таймауту');
     await k.press(NUR_CHAT, hMsg, `h:${held.id}`);
 
-    for (const messageId of [aMsg, dMsg, hMsg]) {
-      expect(hasHold(messageId)).toBe(false);
-      expect(
-        k.telegram
-          .message(NUR_CHAT, messageId)
-          ?.buttons?.flat()
-          .map((b) => b.text),
-      ).toEqual(['A ⭐', 'B']);
-    }
+    expect(texts(aMsg)).toEqual([]);
+    expect(texts(dMsg)).toEqual(['A ⭐', 'B']);
+    expect(texts(hMsg)).toEqual(['A ⭐', 'B']);
+
+    await k.press(NUR_CHAT, dMsg, `a:${decided.id}:B`);
+    expect(texts(dMsg)).toEqual([]);
+    expect(k.telegram.message(NUR_CHAT, dMsg)?.text).not.toContain('Кнопки — чтобы переиграть');
   });
 
   test('«Жди меня» на решённом вопросе (старая кнопка) — подсказка, без ошибки', async () => {

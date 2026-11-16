@@ -29,7 +29,8 @@ export class Messages {
     if (question.heldAt !== undefined && question.status === 'open') text += '\n\n⏸ Агент ждёт твоего ответа.';
     const r = question.resolution;
     if (r?.by === 'agent') {
-      text += `\n\n🤖 ${Messages.choice(r)}${r.reason ? ` ${r.reason}` : ''}. Кнопки — чтобы переиграть.`;
+      const hint = Messages.humanAnswered(question) ? '' : ' Кнопки — чтобы переиграть.';
+      text += `\n\n🤖 ${Messages.choice(r)}${r.reason ? ` ${r.reason}` : ''}.${hint}`;
     } else if (r?.by === 'human') {
       text += `\n\n👤 ${Messages.choice(r)}.`;
     }
@@ -37,13 +38,21 @@ export class Messages {
     return text;
   }
 
-  /** Кнопки вариантов (остаются для переигрывания) и «Жди меня» — пока вопрос открыт и не удержан. */
+  /**
+   * Кнопки вопроса. Ответил человек (в том числе переигрыванием) — кнопок нет, переиграть можно reply.
+   * Иначе — варианты (после решения агента — для переигрывания) и «Жди меня», пока вопрос открыт и не удержан.
+   */
   static questionButtons(question: Question): Keyboard {
+    if (Messages.humanAnswered(question)) return [];
     const options = question.options.map((o) => [
       { text: `${o.id}${Messages.star(question, o.id)}`, data: `a:${question.id}:${o.id}` },
     ]);
     const canHold = question.status === 'open' && question.heldAt === undefined;
     return canHold ? [...options, [{ text: 'Жди меня', data: `h:${question.id}` }]] : options;
+  }
+
+  private static humanAnswered(question: Question): boolean {
+    return question.resolution?.by === 'human' || question.lateAnswers.length > 0;
   }
 
   /** Реакция на сообщение человека: входящее в ящике сессии. */
