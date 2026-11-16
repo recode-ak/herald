@@ -1,0 +1,1 @@
+Задача «Мост pi» трека question-group: src/pi/bridge.ts (+тест), src/app/agent.ts (awaitQuestion отмечает to-terminal), тест api. Причина — spec п. 19.
