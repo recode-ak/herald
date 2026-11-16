@@ -9,5 +9,5 @@
 
 ---
 
-- [~] **Track: Очистка БД herald по сроку хранения; запуск и отчёт через server-ops**
+- [x] **Track: Очистка БД herald по сроку хранения; запуск и отчёт через server-ops**
 *Link: [./tracks/retention_20261117/](./tracks/retention_20261117/)*

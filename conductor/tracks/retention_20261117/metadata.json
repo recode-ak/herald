@@ -1,8 +1,8 @@
 {
   "track_id": "retention_20261117",
   "type": "feature",
-  "status": "in_progress",
+  "status": "completed",
   "created_at": "2026-11-16T20:28:40Z",
-  "updated_at": "2026-11-16T20:28:40Z",
+  "updated_at": "2026-11-16T20:37:43Z",
   "description": "Очистка БД herald по сроку хранения; запуск и отчёт через server-ops"
 }

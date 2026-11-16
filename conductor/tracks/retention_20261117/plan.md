@@ -14,11 +14,11 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Документы — `docs/model.md` «Хранение», `docs/deploy.md`, `docs/install.md` (bb214e8)
 - [x] Task: Conductor - User Manual Verification 'Фаза 1: Очистка в herald' (12a47ff) (Protocol in workflow.md)
 
-## Фаза 2: server-ops и выкатка
+## Фаза 2: server-ops и выкатка [checkpoint: d815da2]
 
 Критерии фазы: herald обновлён на проде; служба `herald-retention` стоит в cron; статус виден в health-check.
 
 - [x] Task: Выкатка herald (`scripts/deploy.sh`), `bun run purge --dry-run` на проде (9086031)
 - [x] Task: Служба server-ops `herald-retention` — скрипт, `service.conf`, README, таблица служб; `deploy.sh --only` (server-ops 2d674fb)
 - [x] Task: Ручной прогон и проверка `40-statusfiles`; отметка в `docs/deploy.md` (server-ops 2d674fb, herald bb214e8)
-- [ ] Task: Conductor - User Manual Verification 'Фаза 2: server-ops и выкатка' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 2: server-ops и выкатка' (d815da2) (Protocol in workflow.md)
