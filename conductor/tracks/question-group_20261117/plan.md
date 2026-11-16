@@ -10,7 +10,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Хранилище — миграция v6 (`items`, `terminal_at`, `message_links.item`), чтение старых строк (0fd9793)
 - [x] Task: Бот — пункты по очереди, «Вопрос N из M», ответ по пункту, `answer` по готовности пачки (5610755)
 - [x] Task: Бот — «Жди меня (вся пачка)», «🖥 В терминал», итог решения агента (5610755)
-- [ ] Task: Агент и HTTP — `ask` с `questions`, `decide`/`answered` с `answers`, `POST /v1/to-terminal`, провод
+- [x] Task: Агент и HTTP — `ask` с `questions`, `decide`/`answered` с `answers`, `POST /v1/to-terminal`, провод (40362c5)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 1: Домен, хранилище, сервер' (Protocol in workflow.md)
 
 ## Фаза 2: Клиенты, документы и выкатка
