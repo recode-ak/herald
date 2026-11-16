@@ -1,7 +1,7 @@
 import type { Access } from '../domain/access.ts';
 import { DomainError } from '../domain/errors.ts';
 import type { InboxItem, InboxKind } from '../domain/inbox.ts';
-import { type Choice, Question, type QuestionOption } from '../domain/question.ts';
+import { type Choice, type ItemAnswer, type ItemDraft, Question } from '../domain/question.ts';
 import { Session } from '../domain/session.ts';
 import { Messages } from './messages.ts';
 import { Notices } from './notices.ts';
@@ -21,13 +21,11 @@ export interface AgentDeps {
   timeZone: string;
 }
 
-export interface AskInput {
-  text: string;
-  options: QuestionOption[];
-  recommended?: string;
+/** Одиночный вопрос (поля пункта) или пачка (`items`); `timeoutMs` — на весь вопрос. */
+export type AskInput = (ItemDraft | { items: ItemDraft[] }) & {
   /** Сколько агент ждёт, прежде чем решить сам; без него решать будет нельзя. */
-  timeoutMs?: number;
-}
+  timeoutMs?: number | undefined;
+};
 
 /** Сценарии агента: уведомление, вопрос, решение, статус, входящие. Каждое обращение отмечает сессию активной. */
 export class AgentService {
@@ -50,53 +48,72 @@ export class AgentService {
     this.deps.store.saveLink({ chatId, messageId, sessionKey: session.key });
   }
 
+  /** Вопрос или пачка: человеку уходит первый пункт, следующие — по мере ответов. */
   async ask(caller: Caller, input: AskInput): Promise<Question> {
     const session = this.enter(caller);
     const question = Question.ask(
       { ...input, id: this.deps.ids.next('q'), sessionKey: session.key, person: caller.person },
       this.deps.clock.now(),
     );
-    const buttons = Messages.questionButtons(question);
-    for (const button of buttons.flat()) {
-      if (Buffer.byteLength(button.data) > Messages.CALLBACK_MAX_BYTES) {
-        throw new DomainError(`id варианта слишком длинный: «${button.data}»`);
+    for (let n = 1; n <= question.items.length; n++) {
+      for (const button of Messages.questionButtons(question, n).flat()) {
+        if (Buffer.byteLength(button.data) > Messages.CALLBACK_MAX_BYTES) {
+          throw new DomainError(`id варианта слишком длинный: «${button.data}»`);
+        }
       }
     }
     const chatId = this.deps.access.chatIdOf(caller.person);
+    // Вопрос сохраняется после отправки: сбой Telegram его не оставит.
     const messageId = await this.deps.telegram.send({
       chatId,
       text: Messages.question(question, session, this.deps.timeZone),
       html: Messages.questionHtml(question, session, this.deps.timeZone),
-      buttons,
+      buttons: Messages.questionButtons(question),
     });
     this.deps.store.transaction(() => {
       this.deps.store.saveQuestion(question);
-      this.deps.store.saveLink({ chatId, messageId, sessionKey: session.key, questionId: question.id });
+      this.deps.store.saveLink({
+        chatId,
+        messageId,
+        sessionKey: session.key,
+        questionId: question.id,
+        ...(question.isBatch && { item: 1 }),
+      });
     });
     return question;
   }
 
   /**
-   * Человек ответил в терминале агента: вопрос закрыт его ответом, сообщение перерисовано без кнопок.
+   * Человек ответил в терминале агента: пункты закрыты его ответами, сообщения перерисованы без кнопок.
    * Во входящие ответ не попадает — агент его уже знает.
    */
-  async answered(caller: Caller, questionId: string, choice: Choice): Promise<Question> {
+  async answered(caller: Caller, questionId: string, answers: Choice | readonly ItemAnswer[]): Promise<Question> {
     const session = this.enter(caller);
     const question = this.ownQuestion(caller, questionId);
-    question.answerInTerminal(choice, this.deps.clock.now());
+    question.answerInTerminal(answers, this.deps.clock.now());
     this.deps.store.saveQuestion(question);
     this.deps.waiter.notify(Waiter.questionTopic(questionId));
     await this.notices.refreshQuestion(question, session);
+    await this.notices.advance(question, session, this.deps.access.chatIdOf(caller.person));
     return question;
   }
 
-  /** Решение агента (по таймауту; вопрос без таймаута решает только человек). Сообщение вопроса обновляется, кнопки остаются для переигрывания. */
-  async decide(caller: Caller, questionId: string, choice: Choice, reason: string): Promise<Question> {
+  /**
+   * Решение агента по неотвеченным пунктам (по таймауту; вопрос без таймаута решает только человек).
+   * Сообщения пунктов обновляются, кнопки остаются для переигрывания; пункты, которых человек не видел, — итогом.
+   */
+  async decide(
+    caller: Caller,
+    questionId: string,
+    answers: Choice | readonly ItemAnswer[],
+    reason: string,
+  ): Promise<Question> {
     const session = this.enter(caller);
     const question = this.ownQuestion(caller, questionId);
-    question.decide(choice, reason, this.deps.clock.now());
+    question.decide(answers, reason, this.deps.clock.now());
     this.deps.store.saveQuestion(question);
     await this.notices.refreshQuestion(question, session);
+    await this.notices.decidedRest(question, session, this.deps.access.chatIdOf(caller.person));
     return question;
   }
 

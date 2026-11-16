@@ -1,7 +1,7 @@
 import type { Access, PersonId } from '../domain/access.ts';
 import { DomainError } from '../domain/errors.ts';
 import { InboxItem, type InboxKind } from '../domain/inbox.ts';
-import type { Choice, Question } from '../domain/question.ts';
+import type { Choice, Question, Resolution } from '../domain/question.ts';
 import type { Session } from '../domain/session.ts';
 import { Messages } from './messages.ts';
 import { Notices } from './notices.ts';
@@ -61,9 +61,15 @@ export class HumanService {
 
   private async onCallback(person: PersonId, update: CallbackUpdate): Promise<string> {
     const [kind, id, ...rest] = update.data.split(':');
-    if ((kind === 'a' || kind === 'h') && id && !this.deps.store.question(id)) return Messages.QUESTION_GONE;
+    const questionKinds = ['a', 'b', 'h', 't'];
+    if (kind && questionKinds.includes(kind) && id && !this.deps.store.question(id)) return Messages.QUESTION_GONE;
     if (kind === 'a' && id && rest.length > 0) return this.answer(person, id, { option: rest.join(':') }, update);
+    if (kind === 'b' && id && rest.length > 1) {
+      const n = Number(rest[0]);
+      return this.answer(person, id, { option: rest.slice(1).join(':') }, update, n);
+    }
     if (kind === 'h' && id && rest.length === 0) return this.hold(person, id);
+    if (kind === 't' && id && rest.length === 0) return this.toTerminal(person, id);
     if (kind === 's' && id && rest.length === 0) return this.select(person, update.chatId, id);
     return '⚠️ кнопка устарела';
   }
@@ -81,7 +87,7 @@ export class HumanService {
       if (!link) return Messages.WHOM;
       if (command) return this.post(person, link.sessionKey, 'command', command, update);
       if (link.questionId) {
-        await this.answer(person, link.questionId, { text }, update);
+        await this.answer(person, link.questionId, { text }, update, link.item ?? 1);
         return undefined;
       }
       return this.post(person, link.sessionKey, 'directive', text, update);
@@ -95,28 +101,93 @@ export class HumanService {
       : this.post(person, target, 'directive', text, update);
   }
 
-  /** Ответ на вопрос: кнопкой (`option`) или reply (`text`). Поздний — в `late-answer`. */
+  /**
+   * Ответ на пункт `n` вопроса: кнопкой (`option`) или reply (`text`). Отвечены все пункты — `answer` во входящие
+   * (у пачки — все ответы одним); иначе — следующий пункт новым сообщением. Ответ на решённый вопрос — `late-answer`.
+   */
   private async answer(
     person: PersonId,
     questionId: string,
     choice: Choice,
     update: MessageUpdate | CallbackUpdate,
+    n = 1,
   ): Promise<string> {
     const { store, clock } = this.deps;
     const question = this.ownQuestion(person, questionId);
     const session = this.ownSession(person, question.sessionKey);
-    const outcome = question.answer(choice, clock.now());
-    const resolution = outcome === 'answer' ? question.resolution : question.lateAnswers.at(-1);
+    const outcome = question.answer(choice, clock.now(), n);
+    const resolution = outcome === 'answer' ? question.item(n).resolution : question.item(n).lateAnswers.at(-1);
     if (!resolution) throw new DomainError(`вопрос ${questionId}: ответ не записан`);
+    const item = this.answerItem(question, session, outcome, n, resolution);
+    store.transaction(() => {
+      store.saveQuestion(question);
+      if (item) store.saveInboxItem(item);
+    });
+    await this.notices.refreshQuestion(question, session);
+    const next = await this.notices.advance(question, session, update.chatId);
+    // Кнопка: перерисованный вопрос и всплывающий ответ — уже квитанция. Текст reply — реакция на нём.
+    const warning = Messages.offline(session, clock.now());
+    if (update.kind === 'message') {
+      if (item) await this.notices.queued(item, session, update.chatId, update.messageId);
+      if (warning) await this.notices.warn(warning, update.chatId, update.messageId);
+    }
+    // Будим после реакции «в ящике»: иначе агент прочтёт раньше, и «прочитано» её затрёт не по порядку.
+    this.deps.waiter.notify(Waiter.questionTopic(questionId));
+    this.deps.waiter.notify(Waiter.sessionTopic(session.key));
+    const label = resolution.option ?? 'ответ принят';
+    const more = next !== undefined ? ` · дальше вопрос ${next} из ${question.items.length}` : '';
+    const text = outcome === 'answer' ? `Принят ${label}${more}` : `Переигрывание вопроса ${questionId}: ${label}`;
+    return warning && update.kind === 'callback' ? `${text} · ${warning}` : text;
+  }
+
+  /** Входящее по ответу: поздний — сразу; обычный — когда отвечены все пункты. */
+  private answerItem(
+    question: Question,
+    session: Session,
+    outcome: 'answer' | 'late',
+    n: number,
+    resolution: Resolution,
+  ): InboxItem | undefined {
+    if (outcome === 'answer' && question.status !== 'answered') return undefined;
+    const single = !question.isBatch;
+    const text =
+      outcome === 'late'
+        ? single
+          ? Messages.answerText(question, resolution)
+          : Messages.itemAnswerText(question, n, resolution)
+        : single
+          ? Messages.answerText(question, resolution)
+          : Messages.answersText(question);
+    const option = outcome === 'late' || single ? resolution.option : undefined;
+    return InboxItem.create(
+      {
+        id: this.deps.ids.next('i'),
+        sessionKey: session.key,
+        person: question.person,
+        kind: outcome === 'answer' ? 'answer' : 'late-answer',
+        text,
+        questionId: question.id,
+        ...(option !== undefined && { option }),
+      },
+      this.deps.clock.now(),
+    );
+  }
+
+  /** «🖥 В терминал»: неотвеченные пункты агент задаст у себя; бот их больше не присылает. */
+  private async toTerminal(person: PersonId, questionId: string): Promise<string> {
+    const { store, clock } = this.deps;
+    const question = this.ownQuestion(person, questionId);
+    const session = this.ownSession(person, question.sessionKey);
+    if (question.terminalAt !== undefined) return 'Уже в терминале';
+    question.moveToTerminal(clock.now());
     const item = InboxItem.create(
       {
         id: this.deps.ids.next('i'),
         sessionKey: session.key,
         person,
-        kind: outcome === 'answer' ? 'answer' : 'late-answer',
-        text: Messages.answerText(question, resolution),
+        kind: 'to-terminal',
+        text: Messages.toTerminalText(question),
         questionId,
-        ...(resolution.option !== undefined && { option: resolution.option }),
       },
       clock.now(),
     );
@@ -125,18 +196,10 @@ export class HumanService {
       store.saveInboxItem(item);
     });
     await this.notices.refreshQuestion(question, session);
-    // Кнопка: перерисованный вопрос и всплывающий ответ — уже квитанция. Текст reply — реакция на нём.
-    const warning = Messages.offline(session, clock.now());
-    if (update.kind === 'message') {
-      await this.notices.queued(item, session, update.chatId, update.messageId);
-      if (warning) await this.notices.warn(warning, update.chatId, update.messageId);
-    }
-    // Будим после реакции «в ящике»: иначе агент прочтёт раньше, и «прочитано» её затрёт не по порядку.
     this.deps.waiter.notify(Waiter.questionTopic(questionId));
     this.deps.waiter.notify(Waiter.sessionTopic(session.key));
-    const label = resolution.option ?? 'ответ принят';
-    const text = outcome === 'answer' ? `Принят ${label}` : `Переигрывание вопроса ${questionId}: ${label}`;
-    return warning && update.kind === 'callback' ? `${text} · ${warning}` : text;
+    const warning = Messages.offline(session, clock.now());
+    return warning ? `Переведено в терминал · ${warning}` : 'Переведено в терминал';
   }
 
   private async hold(person: PersonId, questionId: string): Promise<string> {

@@ -1,7 +1,12 @@
-import type { Question, Resolution } from '../domain/question.ts';
+import type { Question, QuestionItem, Resolution } from '../domain/question.ts';
 import type { Session } from '../domain/session.ts';
 import { Markup } from './markup.ts';
 import type { Keyboard } from './telegram.ts';
+
+/** Как показать сообщение пункта: `sent` — последний отправленный пункт пачки. */
+export interface QuestionView {
+  sent?: number;
+}
 
 /** Как оформить части сообщения: обычный текст (запасной) или HTML Telegram. */
 interface Style {
@@ -41,48 +46,103 @@ export class Messages {
     return Messages.notifyIn(HTML, session, text);
   }
 
-  /** Текст вопроса с текущим состоянием: срок, решение, переигрывания. `timeZone` — пояс, в котором показан срок. */
-  static question(question: Question, session: Session, timeZone: string): string {
-    return Messages.questionIn(PLAIN, question, session, timeZone);
+  /**
+   * Сообщение пункта `n` вопроса с текущим состоянием: срок, решение, переигрывания. `timeZone` — пояс, в котором
+   * показан срок. `view.sent` — последний отправленный пункт: на его сообщении — итог ответов в терминале на остальные.
+   */
+  static question(question: Question, session: Session, timeZone: string, n = 1, view: QuestionView = {}): string {
+    return Messages.questionIn(PLAIN, question, session, timeZone, n, view);
   }
 
-  static questionHtml(question: Question, session: Session, timeZone: string): string {
-    return Messages.questionIn(HTML, question, session, timeZone);
+  static questionHtml(question: Question, session: Session, timeZone: string, n = 1, view: QuestionView = {}): string {
+    return Messages.questionIn(HTML, question, session, timeZone, n, view);
+  }
+
+  /** Итог решения агента по пунктам пачки, которые человек не видел (после `sent`); reply на него — указание. */
+  static decidedRest(question: Question, session: Session, sent: number): string {
+    return Messages.decidedRestIn(PLAIN, question, session, sent);
+  }
+
+  static decidedRestHtml(question: Question, session: Session, sent: number): string {
+    return Messages.decidedRestIn(HTML, question, session, sent);
+  }
+
+  /** Есть ли что сказать итогом решения агента: неотправленные пункты, решённые агентом. */
+  static hasDecidedRest(question: Question, sent: number): boolean {
+    return question.items.slice(sent).some((i) => i.resolution?.by === 'agent');
   }
 
   private static notifyIn(style: Style, session: Session, text: string): string {
     return `${style.bold(style.plain(Messages.header(session)))}\n${style.markdown(text)}`;
   }
 
-  private static questionIn(style: Style, question: Question, session: Session, timeZone: string): string {
-    const lines = [
-      style.bold(style.plain(Messages.header(session))),
-      `❓ ${style.bold(style.markdown(question.text))}`,
-    ];
-    if (question.options.length > 0) {
+  private static questionIn(
+    style: Style,
+    question: Question,
+    session: Session,
+    timeZone: string,
+    n: number,
+    view: QuestionView,
+  ): string {
+    const item = question.item(n);
+    const lines = [style.bold(style.plain(Messages.header(session)))];
+    if (question.isBatch) lines.push(style.italic(`Вопрос ${n} из ${question.items.length}`));
+    lines.push(`❓ ${style.bold(style.markdown(item.text))}`);
+    if (item.options.length > 0) {
       lines.push(
         '',
-        ...question.options.map(
-          (o) => `${style.bold(style.plain(o.id))}: ${style.markdown(o.text)}${Messages.star(question, o.id)}`,
+        ...item.options.map(
+          (o) => `${style.bold(style.plain(o.id))}: ${style.markdown(o.text)}${Messages.star(item, o.id)}`,
         ),
       );
     }
-    const hint =
-      question.options.length > 0 ? 'Ответь кнопкой или reply на это сообщение.' : 'Ответь reply на это сообщение.';
-    lines.push('', style.italic(hint));
+    const moved = question.terminalAt !== undefined;
+    if (!moved) {
+      const hint =
+        item.options.length > 0 ? 'Ответь кнопкой или reply на это сообщение.' : 'Ответь reply на это сообщение.';
+      lines.push('', style.italic(hint));
+    }
     let text = lines.join('\n');
-    const wait = Messages.waiting(question, timeZone);
-    if (wait) text += `\n\n${wait}`;
-    const r = question.resolution;
+    if (question.status === 'open' && !item.resolution) {
+      const wait = moved ? Messages.TERMINAL : Messages.waiting(question, timeZone);
+      if (wait) text += `\n\n${wait}`;
+    }
+    const r = item.resolution;
     if (r?.by === 'agent') {
-      const replay = Messages.humanAnswered(question) ? '' : ' Кнопки — чтобы переиграть.';
+      const replay = Messages.humanAnswered(item) ? '' : ' Кнопки — чтобы переиграть.';
       text += `\n\n🤖 ${style.plain(`${Messages.choice(r)}${r.reason ? ` ${r.reason}` : ''}`)}.${replay}`;
     } else if (r?.by === 'human') {
       text += `\n\n👤 ${style.plain(Messages.choice(r))}${r.via === 'terminal' ? ' (в терминале)' : ''}.`;
     }
-    for (const late of question.lateAnswers) text += `\n🔁 Переигрывание: ${style.plain(Messages.choice(late))}.`;
+    for (const late of item.lateAnswers) text += `\n🔁 Переигрывание: ${style.plain(Messages.choice(late))}.`;
+    if (view.sent === n) {
+      const rest = question.items
+        .map((it, i) => ({ it, k: i + 1 }))
+        .filter(({ it, k }) => k > n && it.resolution?.via === 'terminal');
+      if (rest.length > 0) {
+        const answers = rest.map(({ it, k }) => style.plain(Messages.itemLine(it, k, it.resolution as Resolution)));
+        text += `\n\n👤 В терминале:\n${answers.join('\n')}`;
+      }
+    }
     return text;
   }
+
+  private static decidedRestIn(style: Style, question: Question, session: Session, sent: number): string {
+    const rest = question.items
+      .map((it, i) => ({ it, k: i + 1 }))
+      .filter(({ it, k }) => k > sent && it.resolution?.by === 'agent');
+    const reason = rest[0]?.it.resolution?.reason;
+    return [
+      style.bold(style.plain(Messages.header(session))),
+      `🤖 ${style.plain(`Агент решил${reason ? ` ${reason}` : ''} остальные вопросы:`)}`,
+      ...rest.map(({ it, k }) => style.plain(Messages.itemLine(it, k, it.resolution as Resolution))),
+      '',
+      style.italic('Переиграть — reply на это сообщение: уйдёт указанием.'),
+    ].join('\n');
+  }
+
+  /** Вопрос переведён в терминал, пункт ещё не отвечен. */
+  private static readonly TERMINAL = '🖥 Переведено в терминал — ответь там; reply здесь тоже примется.';
 
   /** Сколько ждёт агент — пока вопрос открыт: срок, «Жди меня» или без ограничения. */
   private static waiting(question: Question, timeZone: string): string | undefined {
@@ -112,21 +172,29 @@ export class Messages {
   }
 
   /**
-   * Кнопки вопроса. Ответил человек (в том числе переигрыванием) — кнопок нет, переиграть можно reply.
-   * Иначе — варианты (после решения агента — для переигрывания) и «Жди меня», пока вопрос открыт, не удержан
-   * и задан с таймаутом (без таймаута агент и так ждёт: по кнопке видно, решит ли он сам).
+   * Кнопки сообщения пункта `n`. Ответил человек (в том числе переигрыванием) — кнопок нет, переиграть можно reply.
+   * Переведён в терминал и пункт не отвечен — тоже нет (reply примется). Иначе — варианты (после решения агента —
+   * для переигрывания); пока пункт открыт — «🖥 В терминал» и «Жди меня» (если вопрос с таймаутом и не удержан:
+   * без таймаута агент и так ждёт). «Жди меня» и перевод действуют на всю пачку.
    */
-  static questionButtons(question: Question): Keyboard {
-    if (Messages.humanAnswered(question)) return [];
-    const options = question.options.map((o) => [
-      { text: `${o.id}${Messages.star(question, o.id)}`, data: `a:${question.id}:${o.id}` },
-    ]);
-    const canHold = question.status === 'open' && question.heldAt === undefined && question.deadlineAt !== undefined;
-    return canHold ? [...options, [{ text: 'Жди меня', data: `h:${question.id}` }]] : options;
+  static questionButtons(question: Question, n = 1): Keyboard {
+    const item = question.item(n);
+    if (Messages.humanAnswered(item)) return [];
+    const open = question.status === 'open' && !item.resolution;
+    const moved = question.terminalAt !== undefined;
+    if (open && moved) return [];
+    const data = (o: string) => (question.isBatch ? `b:${question.id}:${n}:${o}` : `a:${question.id}:${o}`);
+    const rows: Keyboard = item.options.map((o) => [{ text: `${o.id}${Messages.star(item, o.id)}`, data: data(o.id) }]);
+    if (!open) return rows;
+    if (question.heldAt === undefined && question.deadlineAt !== undefined) {
+      rows.push([{ text: question.isBatch ? 'Жди меня (вся пачка)' : 'Жди меня', data: `h:${question.id}` }]);
+    }
+    rows.push([{ text: '🖥 В терминал', data: `t:${question.id}` }]);
+    return rows;
   }
 
-  private static humanAnswered(question: Question): boolean {
-    return question.resolution?.by === 'human' || question.lateAnswers.length > 0;
+  private static humanAnswered(item: QuestionItem): boolean {
+    return item.resolution?.by === 'human' || item.lateAnswers.length > 0;
   }
 
   /** Реакция на сообщение человека: входящее в ящике сессии. */
@@ -214,10 +282,51 @@ export class Messages {
     return `${Math.floor(hours / 24)} дн назад`;
   }
 
-  /** Текст ответа во входящих: вариант с подписью или свободный текст. */
+  /** Текст ответа во входящих (первый пункт; у одиночного вопроса — сам вопрос): вариант с подписью или свободный текст. */
   static answerText(question: Question, r: Resolution): string {
+    return Messages.answerOf(question.item(1), r);
+  }
+
+  /** Ответ на пункт пачки: «3. Логи? — B: файл». */
+  static itemAnswerText(question: Question, n: number, r: Resolution): string {
+    return Messages.itemLine(question.item(n), n, r);
+  }
+
+  /** Ответы на все пункты пачки — строка на пункт. */
+  static answersText(question: Question): string {
+    return question.items
+      .flatMap((it, i) => (it.resolution ? [Messages.itemLine(it, i + 1, it.resolution)] : []))
+      .join('\n');
+  }
+
+  /** Входящее `to-terminal`: что уже отвечено и что спросить (варианты, рекомендованный). */
+  static toTerminalText(question: Question): string {
+    const done = question.items.map((it, i) => ({ it, k: i + 1 })).filter(({ it }) => it.resolution);
+    const ask = question.items.map((it, i) => ({ it, k: i + 1 })).filter(({ it }) => !it.resolution);
+    const lines = [
+      `Человек перевёл вопрос ${question.id} в терминал: задай неотвеченные пункты здесь, своим UI, и закрой ответы инструментом answered (CLI — herald answered).`,
+    ];
+    if (done.length > 0) {
+      lines.push('', 'Уже ответил:', ...done.map(({ it, k }) => Messages.itemLine(it, k, it.resolution as Resolution)));
+    }
+    lines.push(
+      '',
+      'Спросить:',
+      ...ask.map(({ it, k }) => {
+        const options = it.options.map((o) => `${o.id}: ${o.text}${Messages.star(it, o.id)}`).join('; ');
+        return `${k}. ${it.text} — ${options ? `варианты: ${options}` : 'свободный ответ'}`;
+      }),
+    );
+    return lines.join('\n');
+  }
+
+  private static itemLine(item: QuestionItem, n: number, r: Resolution): string {
+    return `${n}. ${item.text} — ${Messages.answerOf(item, r)}`;
+  }
+
+  private static answerOf(item: QuestionItem, r: Resolution): string {
     if (r.option === undefined) return r.text ?? '';
-    const option = question.options.find((o) => o.id === r.option);
+    const option = item.options.find((o) => o.id === r.option);
     return option ? `${option.id}: ${option.text}` : r.option;
   }
 
@@ -225,7 +334,7 @@ export class Messages {
     return r.option !== undefined ? `Принят ${r.option}` : `Принято «${r.text}»`;
   }
 
-  private static star(question: Question, optionId: string): string {
-    return question.recommended === optionId ? ' ⭐' : '';
+  private static star(item: QuestionItem, optionId: string): string {
+    return item.recommended === optionId ? ' ⭐' : '';
   }
 }

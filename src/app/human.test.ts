@@ -113,7 +113,7 @@ describe('Ответы на вопрос', () => {
     const dMsg = k.telegram.last(NUR_CHAT)!.messageId;
     const held = await k.agent.ask(nur, db);
     const hMsg = k.telegram.last(NUR_CHAT)!.messageId;
-    expect(texts(hMsg)).toEqual(['A ⭐', 'B', 'Жди меня']);
+    expect(texts(hMsg)).toEqual(['A ⭐', 'B', 'Жди меня', '🖥 В терминал']);
 
     await k.press(NUR_CHAT, aMsg, `a:${answered.id}:B`);
     await k.agent.decide(nur, decided.id, { option: 'A' }, 'по таймауту');
@@ -121,7 +121,7 @@ describe('Ответы на вопрос', () => {
 
     expect(texts(aMsg)).toEqual([]);
     expect(texts(dMsg)).toEqual(['A ⭐', 'B']);
-    expect(texts(hMsg)).toEqual(['A ⭐', 'B']);
+    expect(texts(hMsg)).toEqual(['A ⭐', 'B', '🖥 В терминал']);
 
     await k.press(NUR_CHAT, dMsg, `a:${decided.id}:B`);
     expect(texts(dMsg)).toEqual([]);
@@ -134,6 +134,138 @@ describe('Ответы на вопрос', () => {
     await k.agent.decide(nur, q.id, { option: 'A' }, 'по таймауту');
     await k.press(NUR_CHAT, k.telegram.last(NUR_CHAT)!.messageId, `h:${q.id}`);
     expect(k.telegram.callbackAnswers.at(-1)?.text).toBe(`⚠️ вопрос ${q.id} уже решён`);
+  });
+});
+
+const trio = {
+  items: [
+    {
+      text: 'База?',
+      options: [
+        { id: 'A', text: 'SQLite' },
+        { id: 'B', text: 'JSON' },
+      ],
+      recommended: 'A',
+    },
+    { text: 'Порт?', options: [] },
+    {
+      text: 'Логи?',
+      options: [
+        { id: 'A', text: 'stderr' },
+        { id: 'B', text: 'файл' },
+      ],
+      recommended: 'B',
+    },
+  ],
+  timeoutMs: 180_000,
+};
+
+describe('Пачка вопросов', () => {
+  const buttons = (k: ReturnType<typeof setup>, messageId: number) =>
+    (k.telegram.message(NUR_CHAT, messageId)?.buttons ?? []).flat().map((b) => b.text);
+
+  test('пункты по одному: ответ → следующий новым сообщением; все ответы — одним answer', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, trio);
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(1);
+    const m1 = k.telegram.last(NUR_CHAT)!;
+    expect(m1.text).toContain('Вопрос 1 из 3');
+
+    await k.press(NUR_CHAT, m1.messageId, `b:${q.id}:1:B`);
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('Принят B · дальше вопрос 2 из 3');
+    expect(buttons(k, m1.messageId)).toEqual([]);
+    expect(await k.agent.inbox(nur)).toEqual([]);
+    const m2 = k.telegram.last(NUR_CHAT)!;
+    expect(m2.messageId).not.toBe(m1.messageId);
+    expect(m2.text).toContain('Вопрос 2 из 3');
+
+    await k.say(NUR_CHAT, '4518', m2.messageId);
+    const m3 = k.telegram.last(NUR_CHAT)!;
+    expect(m3.text).toContain('Вопрос 3 из 3');
+    expect(k.telegram.reactions).toEqual([]);
+
+    await k.press(NUR_CHAT, m3.messageId, `b:${q.id}:3:A`);
+    expect(k.store.question(q.id)?.status).toBe('answered');
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('Принят A');
+    const items = await k.agent.inbox(nur);
+    expect(items.map((i) => i.toState())).toMatchObject([
+      { kind: 'answer', questionId: q.id, text: '1. База? — B: JSON\n2. Порт? — 4518\n3. Логи? — A: stderr' },
+    ]);
+    expect(items[0]?.option).toBeUndefined();
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(3);
+  });
+
+  test('«Жди меня (вся пачка)» — весь вопрос удержан, пометка на текущем пункте; агенту решать нельзя', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, trio);
+    const m1 = k.telegram.last(NUR_CHAT)!;
+    expect(buttons(k, m1.messageId)).toEqual(['A ⭐', 'B', 'Жди меня (вся пачка)', '🖥 В терминал']);
+    await k.press(NUR_CHAT, m1.messageId, `h:${q.id}`);
+    expect(k.telegram.message(NUR_CHAT, m1.messageId)?.text).toEndWith('⏸ Агент ждёт твоего ответа.');
+    await k.press(NUR_CHAT, m1.messageId, `b:${q.id}:1:A`);
+    expect(k.telegram.last(NUR_CHAT)?.text).toEndWith('⏸ Агент ждёт твоего ответа.');
+    await expect(k.agent.decide(nur, q.id, [], 'по таймауту')).rejects.toThrow('просил ждать');
+  });
+
+  test('«🖥 В терминал»: кнопки сняты, следующие не приходят, агенту to-terminal (один раз); reply принимается', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, trio);
+    const m1 = k.telegram.last(NUR_CHAT)!;
+    await k.press(NUR_CHAT, m1.messageId, `b:${q.id}:1:B`);
+    const m2 = k.telegram.last(NUR_CHAT)!;
+
+    await k.press(NUR_CHAT, m2.messageId, `t:${q.id}`);
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('Переведено в терминал');
+    expect(k.store.question(q.id)?.terminalAt).toBeDefined();
+    const after = k.telegram.message(NUR_CHAT, m2.messageId)!;
+    expect(after.text).toEndWith('🖥 Переведено в терминал — ответь там; reply здесь тоже примется.');
+    expect(after.buttons ?? []).toEqual([]);
+    const [item] = await k.agent.inbox(nur);
+    expect(item?.toState()).toMatchObject({ kind: 'to-terminal', questionId: q.id });
+    expect(item?.text).toContain('2. Порт? — свободный ответ');
+
+    await k.press(NUR_CHAT, m2.messageId, `t:${q.id}`);
+    expect(await k.agent.inbox(nur)).toHaveLength(1);
+
+    await k.say(NUR_CHAT, '80', m2.messageId);
+    expect(k.store.question(q.id)?.items[1]?.resolution?.text).toBe('80');
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(2);
+  });
+
+  test('решение агента: текущий пункт — 🤖 и кнопки; неотправленные — итоговым сообщением, reply на него — указание', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, trio);
+    const m1 = k.telegram.last(NUR_CHAT)!;
+    await k.press(NUR_CHAT, m1.messageId, `b:${q.id}:1:B`);
+    const m2 = k.telegram.last(NUR_CHAT)!;
+
+    await k.agent.decide(nur, q.id, [{ item: 2, choice: { text: '80' } }], 'по таймауту');
+    expect(k.telegram.message(NUR_CHAT, m2.messageId)?.text).toEndWith(
+      '🤖 Принято «80» по таймауту. Кнопки — чтобы переиграть.',
+    );
+    const rest = k.telegram.last(NUR_CHAT)!;
+    expect(rest.text).toContain('🤖 Агент решил по таймауту остальные вопросы:\n3. Логи? — B: файл');
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(3);
+
+    await k.say(NUR_CHAT, 'логи лучше в stderr', rest.messageId);
+    expect((await k.agent.inbox(nur)).map((i) => i.toState())).toMatchObject([
+      { kind: 'directive', text: 'логи лучше в stderr' },
+    ]);
+  });
+
+  test('ответ на пункт решённого вопроса — поздний этого пункта', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, trio);
+    const m1 = k.telegram.last(NUR_CHAT)!;
+    await k.agent.decide(nur, q.id, [{ item: 2, choice: { text: '80' } }], 'по таймауту');
+    await k.press(NUR_CHAT, m1.messageId, `b:${q.id}:1:B`);
+    const [item] = await k.agent.inbox(nur);
+    expect(item?.toState()).toMatchObject({
+      kind: 'late-answer',
+      questionId: q.id,
+      option: 'B',
+      text: '1. База? — B: JSON',
+    });
   });
 });
 

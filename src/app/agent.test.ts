@@ -83,6 +83,7 @@ describe('AgentService.ask', () => {
       [{ text: 'A ⭐', data: 'a:q_1:A' }],
       [{ text: 'B', data: 'a:q_1:B' }],
       [{ text: 'Жди меня', data: 'h:q_1' }],
+      [{ text: '🖥 В терминал', data: 't:q_1' }],
     ]);
     expect(store.link(NUR_CHAT, msg.messageId)?.questionId).toBe('q_1');
   });
@@ -94,7 +95,7 @@ describe('AgentService.ask', () => {
     expect(msg.text).toBe(
       '[laptop · u7-school]\n❓ Как назвать?\n\nОтветь reply на это сообщение.\n\n⏳ На раздумье 1 мин — до 05:17, потом агент решит сам.',
     );
-    expect(msg.buttons).toEqual([[{ text: 'Жди меня', data: 'h:q_1' }]]);
+    expect(msg.buttons).toEqual([[{ text: 'Жди меня', data: 'h:q_1' }], [{ text: '🖥 В терминал', data: 't:q_1' }]]);
   });
 
   test('без таймаута — время не ограничено, «Жди меня» нет; решать агенту нельзя', async () => {
@@ -103,7 +104,11 @@ describe('AgentService.ask', () => {
     const q = await agent.ask(nur, untimed);
     const msg = telegram.last(NUR_CHAT)!;
     expect(msg.text).toEndWith('\n\n⏳ Время не ограничено: агент ждёт твоего ответа.');
-    expect(msg.buttons).toEqual([[{ text: 'A ⭐', data: 'a:q_1:A' }], [{ text: 'B', data: 'a:q_1:B' }]]);
+    expect(msg.buttons).toEqual([
+      [{ text: 'A ⭐', data: 'a:q_1:A' }],
+      [{ text: 'B', data: 'a:q_1:B' }],
+      [{ text: '🖥 В терминал', data: 't:q_1' }],
+    ]);
     await expect(agent.decide(nur, q.id, { option: 'A' }, 'по таймауту')).rejects.toThrow('без таймаута');
     expect(store.question(q.id)?.status).toBe('open');
   });
@@ -160,7 +165,7 @@ describe('AgentService.decide', () => {
 
     const after = telegram.message(NUR_CHAT, before.messageId)!;
     expect(after.text).toBe(before.text.replace(/⏳ .*$/, '🤖 Принят A по таймауту. Кнопки — чтобы переиграть.'));
-    expect(after.buttons).toEqual(before.buttons?.slice(0, -1));
+    expect(after.buttons).toEqual(before.buttons?.slice(0, -2));
   });
 
   test('свободный текст решения', async () => {
