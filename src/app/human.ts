@@ -184,15 +184,10 @@ export class HumanService {
       return undefined;
     }
     const now = this.deps.clock.now();
-    const text = [
-      'Сессии на связи:',
-      ...sessions.map((s) => Messages.sessionLine(s, now)),
-      '',
-      'Выбери адресата указания или команды (/clear, /compact).',
-    ];
     await this.deps.telegram.send({
       chatId,
-      text: text.join('\n'),
+      text: Messages.sessions(sessions, now),
+      html: Messages.sessionsHtml(sessions, now),
       buttons: sessions.map((s) => [{ text: Messages.sessionButton(s), data: `s:${HumanService.sessionToken(s)}` }]),
     });
     return undefined;

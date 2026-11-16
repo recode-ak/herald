@@ -240,14 +240,37 @@ describe('/sessions и /status', () => {
     expect(menu.text).toBe(
       [
         'Сессии на связи:',
-        'laptop · herald',
-        'laptop · u7-school — Фаза 2: сценарии (1 мин назад)',
+        '',
+        '🟢 herald',
+        'laptop · статуса нет',
+        '',
+        '🟢 u7-school',
+        'laptop · 1 мин назад',
+        'Фаза 2: сценарии',
         '',
         'Выбери адресата указания или команды (/clear, /compact).',
       ].join('\n'),
     );
     expect(menu.buttons!.map((row) => row.map((b) => b.text))).toEqual([['herald · laptop'], ['u7-school · laptop']]);
     for (const b of menu.buttons!.flat()) expect(Buffer.byteLength(b.data)).toBeLessThanOrEqual(64);
+  });
+
+  test('/sessions в HTML: имя жирным, машина и давность курсивом, статус — Markdown агента', async () => {
+    const k = setup();
+    await k.agent.title(nur, 'dmg <ui>');
+    await k.agent.status(nur, 'ревью `df2caad`');
+    await k.say(NUR_CHAT, '/sessions');
+    expect(k.telegram.last(NUR_CHAT)?.html).toBe(
+      [
+        '<b>Сессии на связи:</b>',
+        '',
+        '🟢 <b>u7-school · dmg &lt;ui&gt;</b>',
+        '<i>laptop · только что</i>',
+        'ревью <code>df2caad</code>',
+        '',
+        '<i>Выбери адресата указания или команды (/clear, /compact).</i>',
+      ].join('\n'),
+    );
   });
 
   test('/status — статусы активных сессий без участия агента', async () => {

@@ -134,10 +134,27 @@ export class Messages {
   /** Реакция на сообщение человека: агент прочитал. */
   static readonly INBOX_READ = '👀';
 
-  /** Строка `/sessions` (там только сессии на связи): имя и последний статус. */
-  static sessionLine(session: Session, now: number): string {
-    const status = session.status ? ` — ${session.status.text} (${Messages.ago(session.status.at, now)})` : '';
-    return `${session.host} · ${session.label}${status}`;
+  /** Меню `/sessions` (там только сессии на связи): по блоку на сессию — имя, машина с давностью статуса, статус. */
+  static sessions(sessions: readonly Session[], now: number): string {
+    return Messages.sessionsIn(PLAIN, sessions, now);
+  }
+
+  static sessionsHtml(sessions: readonly Session[], now: number): string {
+    return Messages.sessionsIn(HTML, sessions, now);
+  }
+
+  private static sessionsIn(style: Style, sessions: readonly Session[], now: number): string {
+    const block = (s: Session) => {
+      const meta = s.status ? `${s.host} · ${Messages.ago(s.status.at, now)}` : `${s.host} · статуса нет`;
+      const lines = [`🟢 ${style.bold(style.plain(s.label))}`, style.italic(style.plain(meta))];
+      if (s.status) lines.push(style.markdown(s.status.text));
+      return lines.join('\n');
+    };
+    return [
+      style.bold('Сессии на связи:'),
+      ...sessions.map(block),
+      style.italic('Выбери адресата указания или команды (/clear, /compact).'),
+    ].join('\n\n');
   }
 
   /** Строка `/status`: последний статус с давностью. */
