@@ -69,7 +69,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] Реализация `src/cli`, `bun run link`
 - [x] Task: Сквозной тест `test/e2e/` — КП 1–5, 7 для CLI (693a7a6)
 - [x] Task: `docs/model.md` — команды CLI (95dacbd)
-- [ ] Task: Conductor - User Manual Verification 'Фаза 4: CLI' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 4: CLI' (Protocol in workflow.md)
 
 ## Фаза 5: Channel для Claude Code
 
