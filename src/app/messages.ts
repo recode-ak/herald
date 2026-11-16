@@ -299,6 +299,11 @@ export class Messages {
       .join('\n');
   }
 
+  /** Входящее `hold`: человек нажал «Жди меня». */
+  static holdText(question: Question): string {
+    return `Человек нажал «Жди меня» на вопросе ${question.id}: решать самому нельзя — жди его ответа без срока.`;
+  }
+
   /** Входящее `to-terminal`: что уже отвечено и что спросить (варианты, рекомендованный). */
   static toTerminalText(question: Question): string {
     const done = question.items.map((it, i) => ({ it, k: i + 1 })).filter(({ it }) => it.resolution);

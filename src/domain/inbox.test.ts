@@ -25,6 +25,8 @@ describe('InboxItem', () => {
     expect(item.questionId).toBe('q1');
     expect(() => InboxItem.create({ ...base, id: 'i2', kind: 'to-terminal', text: 'x' }, t0)).toThrow(DomainError);
     expect(InboxItem.kinds(['to-terminal'])).toEqual(['to-terminal']);
+    expect(() => InboxItem.create({ ...base, id: 'i3', kind: 'hold', text: 'жди' }, t0)).toThrow(DomainError);
+    expect(InboxItem.kinds(['hold'])).toEqual(['hold']);
   });
 
   test('команда терминала — только из списка: /clear, /compact', () => {

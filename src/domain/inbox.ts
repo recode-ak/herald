@@ -4,9 +4,10 @@ import { DomainError } from './errors.ts';
 /**
  * `answer` — ответ на вопрос, `late-answer` — ответ на уже решённый вопрос, `directive` — указание человека,
  * `command` — команда терминала агента (`/clear`, `/compact`): её выполняет не агент, а его окружение (канал, расширение),
- * `to-terminal` — человек перевёл вопрос в терминал: агент задаёт его у себя.
+ * `to-terminal` — человек перевёл вопрос в терминал: агент задаёт его у себя,
+ * `hold` — человек нажал «Жди меня»: агенту решать нельзя, ждать ответа без срока.
  */
-export type InboxKind = 'answer' | 'late-answer' | 'directive' | 'command' | 'to-terminal';
+export type InboxKind = 'answer' | 'late-answer' | 'directive' | 'command' | 'to-terminal' | 'hold';
 
 export interface InboxDraft {
   id: string;
@@ -34,7 +35,17 @@ export class InboxItem {
     return InboxItem.COMMANDS.includes(text);
   }
 
-  static readonly KINDS: readonly InboxKind[] = ['answer', 'late-answer', 'directive', 'command', 'to-terminal'];
+  static readonly KINDS: readonly InboxKind[] = [
+    'answer',
+    'late-answer',
+    'directive',
+    'command',
+    'to-terminal',
+    'hold',
+  ];
+
+  /** Виды, которые относятся к вопросу и без `questionId` не бывают. */
+  private static readonly ABOUT_QUESTION: readonly InboxKind[] = ['answer', 'late-answer', 'to-terminal', 'hold'];
 
   /** Виды из запроса агента; неизвестный — ошибка. */
   static kinds(values: readonly string[]): InboxKind[] {
@@ -48,7 +59,7 @@ export class InboxItem {
   static create(draft: InboxDraft, now: number): InboxItem {
     const text = draft.text.trim();
     if (!text) throw new DomainError('текст входящего пуст');
-    const needsQuestion = draft.kind === 'answer' || draft.kind === 'late-answer' || draft.kind === 'to-terminal';
+    const needsQuestion = InboxItem.ABOUT_QUESTION.includes(draft.kind);
     if (needsQuestion && !draft.questionId) throw new DomainError(`${draft.kind} без id вопроса`);
     if (draft.kind === 'command' && !InboxItem.isCommand(text)) throw new DomainError(`нет команды ${text}`);
     return new InboxItem({ ...draft, text, createdAt: now });

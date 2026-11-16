@@ -241,6 +241,7 @@ describe('HeraldChannel — инструменты', () => {
     expect(client.getInstructions()).toContain('одним ask');
     expect(client.getInstructions()).toContain('to_terminal');
     expect(client.getInstructions()).toContain('kind="to-terminal"');
+    expect(client.getInstructions()).toContain('kind="hold"');
   });
 
   test('неверные аргументы и ошибка сервера — isError с текстом', async () => {
@@ -486,7 +487,7 @@ describe('HeraldChannel — без событий (Claude Code запущен б
     expect(r.text).toContain('Займись тестами');
     expect(r.text).toContain('kind=answer item_id=i_2 question_id=q_1 option=B');
     expect(r.text).toContain('Ответ на вопрос q_1: B: Postgres');
-    expect(herald.lastKinds).toEqual(['directive', 'answer', 'late-answer', 'to-terminal']);
+    expect(herald.lastKinds).toEqual(['directive', 'answer', 'late-answer', 'to-terminal', 'hold']);
     expect(herald.acked).toEqual(['i_1', 'i_2']);
     expect((await call('inbox', {})).text).toContain('входящих нет');
     expect((await call('inbox', { wait_seconds: 'x' })).isError).toBe(true);

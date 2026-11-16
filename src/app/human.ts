@@ -202,11 +202,30 @@ export class HumanService {
     return warning ? `Переведено в терминал · ${warning}` : 'Переведено в терминал';
   }
 
+  /** «Жди меня»: вся пачка удержана; агенту — `hold` (один раз), чтобы не ждал отказа `decide`. */
   private async hold(person: PersonId, questionId: string): Promise<string> {
+    const { store, clock } = this.deps;
     const question = this.ownQuestion(person, questionId);
-    question.hold(this.deps.clock.now());
-    this.deps.store.saveQuestion(question);
-    await this.notices.refreshQuestion(question, this.ownSession(person, question.sessionKey));
+    const session = this.ownSession(person, question.sessionKey);
+    if (question.heldAt !== undefined) return 'Агент подождёт';
+    question.hold(clock.now());
+    const item = InboxItem.create(
+      {
+        id: this.deps.ids.next('i'),
+        sessionKey: session.key,
+        person,
+        kind: 'hold',
+        text: Messages.holdText(question),
+        questionId,
+      },
+      clock.now(),
+    );
+    store.transaction(() => {
+      store.saveQuestion(question);
+      store.saveInboxItem(item);
+    });
+    await this.notices.refreshQuestion(question, session);
+    this.deps.waiter.notify(Waiter.sessionTopic(session.key));
     return 'Агент подождёт';
   }
 

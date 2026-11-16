@@ -92,6 +92,7 @@ const EVENTS_INSTRUCTIONS = [
   '- kind="answer" question_id="..." — ответ на твой вопрос (option — id выбранного варианта).',
   '- kind="late-answer" question_id="..." — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
   '- kind="to-terminal" question_id="..." — человек перевёл вопрос в терминал: задай неотвеченные пункты здесь своим UI (в Claude Code — AskUserQuestion) и закрой ответы инструментом answered.',
+  '- kind="hold" question_id="..." — человек нажал «Жди меня»: decide по вопросу запрещён, не жди срока — жди ответа без таймаута.',
   '',
   'ask задаёт вопрос с вариантами и сразу возвращает id — не жди, продолжай работу; ответ придёт событием. С timeout_seconds: если к сроку ответа нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). Без timeout_seconds решать нельзя — жди ответа. Человек ответил в терминале — закрой вопрос инструментом answered.',
   '',
@@ -107,6 +108,7 @@ const PULL_INSTRUCTIONS = [
   '- kind=answer question_id=... — ответ на твой вопрос (option — id выбранного варианта).',
   '- kind=late-answer question_id=... — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
   '- kind=to-terminal question_id=... — человек перевёл вопрос в терминал: задай неотвеченные пункты здесь своим UI и закрой ответы инструментом answered.',
+  '- kind=hold question_id=... — человек нажал «Жди меня»: decide по вопросу запрещён — жди ответа без таймаута (inbox с wait_seconds).',
   '',
   'ask задаёт вопрос с вариантами и сразу возвращает id; ответ забери инструментом inbox. С timeout_seconds: если к сроку ответа нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). Без timeout_seconds решать нельзя — жди ответа. Человек ответил в терминале — закрой вопрос инструментом answered.',
   '',
@@ -115,7 +117,7 @@ const PULL_INSTRUCTIONS = [
 ].join('\n');
 
 /** Что агент забирает инструментом `inbox`; команды терминала берёт цикл. */
-const PULL_KINDS: readonly InboxKind[] = ['directive', 'answer', 'late-answer', 'to-terminal'];
+const PULL_KINDS: readonly InboxKind[] = ['directive', 'answer', 'late-answer', 'to-terminal', 'hold'];
 
 const OPTIONS_SCHEMA = {
   type: 'array',

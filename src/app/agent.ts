@@ -195,7 +195,8 @@ export class AgentService {
 
   /**
    * Ждать ответа на вопрос до `timeoutMs`; возвращает вопрос (открытый — по таймауту или переведённый в терминал).
-   * Ответ человека (или перевод в терминал), полученный так, отмечается прочитанным — во входящих он не повторится.
+   * Ответ человека (или перевод в терминал) и «Жди меня» по вопросу, полученные так, отмечаются прочитанными —
+   * во входящих они не повторятся.
    */
   async awaitQuestion(caller: Caller, questionId: string, timeoutMs: number): Promise<Question> {
     const session = this.enter(caller);
@@ -204,11 +205,12 @@ export class AgentService {
       const question = this.ownQuestion(caller, questionId);
       const moved = question.status === 'open' && question.terminalAt !== undefined;
       if (question.status !== 'open' || moved) {
-        const kind = moved ? 'to-terminal' : 'answer';
+        // Агент ждал этот вопрос — ответ, перевод и «Жди меня» по нему уже не новость.
+        const kinds: InboxKind[] = [moved ? 'to-terminal' : 'answer', 'hold'];
         const answers = this.deps.store
           .inbox(session.key)
           .pending()
-          .filter((i) => i.kind === kind && i.questionId === questionId);
+          .filter((i) => kinds.includes(i.kind) && i.questionId === questionId);
         if (answers.length > 0)
           await this.ack(
             caller,

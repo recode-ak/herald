@@ -128,6 +128,19 @@ describe('Ответы на вопрос', () => {
     expect(k.telegram.message(NUR_CHAT, dMsg)?.text).not.toContain('Кнопки — чтобы переиграть');
   });
 
+  test('«Жди меня» — агенту входящее hold (один раз): решать нельзя, жди ответа', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, db);
+    const qMsg = k.telegram.last(NUR_CHAT)!;
+    await k.press(NUR_CHAT, qMsg.messageId, `h:${q.id}`);
+    await k.press(NUR_CHAT, qMsg.messageId, `h:${q.id}`);
+    const items = await k.agent.inbox(nur);
+    expect(items.map((i) => i.toState())).toMatchObject([{ kind: 'hold', questionId: q.id }]);
+    expect(items[0]?.text).toBe(
+      `Человек нажал «Жди меня» на вопросе ${q.id}: решать самому нельзя — жди его ответа без срока.`,
+    );
+  });
+
   test('«Жди меня» на решённом вопросе (старая кнопка) — подсказка, без ошибки', async () => {
     const k = setup();
     const q = await k.agent.ask(nur, db);

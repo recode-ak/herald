@@ -153,6 +153,18 @@ describe('Вопрос', () => {
     expect(answered.resolution).toMatchObject({ by: 'human', option: 'B' });
   });
 
+  test('wait отмечает hold этого вопроса прочитанным: агент на CLI и так ждёт', async () => {
+    const k = setup();
+    const id = ((await k.call('/v1/ask', { session, ...db })).json.question as QuestionWire).id;
+    const msg = k.telegram.last(NUR_CHAT)!.messageId;
+    await k.press(msg, `h:${id}`);
+    const waiting = k.call('/v1/question', { session, id, waitMs: 10_000 });
+    await k.sleeping();
+    await k.press(msg, `a:${id}:B`);
+    expect(((await waiting).json.question as QuestionWire).status).toBe('answered');
+    expect(((await k.call('/v1/inbox', { session })).json.items as InboxItemWire[]).length).toBe(0);
+  });
+
   test('wait по таймауту — вопрос open; wait ограничен maxWaitMs сервера', async () => {
     const k = setup(5_000);
     const id = ((await k.call('/v1/ask', { session, ...db })).json.question as QuestionWire).id;
