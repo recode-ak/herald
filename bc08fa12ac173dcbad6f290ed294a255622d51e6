@@ -1,0 +1,1 @@
+Задача: миграция v5. src/infra/sqlite-store.ts: message_links пересоздаётся с created_at DEFAULT unixepoch('subsec')*1000 (ALTER не умеет DEFAULT-выражение); старые связи получают время миграции; CREATE TABLE IF NOT EXISTS — для урезанных баз из тестов миграции. Тест в sqlite-store.test.ts. Зачем: очистка связей уведомлений по сроку.
