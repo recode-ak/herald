@@ -89,6 +89,30 @@ describe('HeraldClient', () => {
     expect((await c.answered(other.id, { text: 'herald' })).resolution).toMatchObject({ via: 'terminal' });
   });
 
+  test('пачка: ask с questions, decide и answered с ответами по пунктам, toTerminal', async () => {
+    const k = setup();
+    const c = k.client();
+    const questions = [
+      { text: 'База?', options, recommended: 'A' },
+      { text: 'Порт?', options: [] },
+    ];
+    const q = await c.ask({ questions, timeoutMs: 60_000 });
+    expect(q.items.map((i) => i.text)).toEqual(['База?', 'Порт?']);
+    const decided = await c.decide(q.id, [{ item: 2, text: '80' }], 'по таймауту');
+    expect(decided.items.map((i) => i.resolution?.by)).toEqual(['agent', 'agent']);
+
+    const other = await c.ask({ questions });
+    const moved = await c.toTerminal();
+    expect(moved.map((m) => m.id)).toEqual([other.id]);
+    expect((await c.awaitQuestion(other.id, 5_000)).terminalAt).toBeDefined();
+    const answered = await c.answered(other.id, [
+      { item: 1, option: 'B' },
+      { item: 2, text: '81' },
+    ]);
+    expect(answered.status).toBe('answered');
+    expect((await c.toTerminal(q.id).catch((e: Error) => e.message)) as string).toContain('уже решён');
+  });
+
   test('awaitQuestion переподключается, пока не придёт ответ', async () => {
     const k = setup();
     const c = k.client();

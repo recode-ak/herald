@@ -213,6 +213,80 @@ describe('herald ask', () => {
   });
 });
 
+describe('herald ask --questions (пачка)', () => {
+  const questions = JSON.stringify([
+    {
+      text: 'База?',
+      options: [
+        { id: 'A', text: 'SQLite' },
+        { id: 'B', text: 'JSON' },
+      ],
+      recommended: 'A',
+    },
+    { text: 'Порт?' },
+  ]);
+
+  test('пункты по одному; ответы всех пунктов — в items, код 0', async () => {
+    const k = setup();
+    const running = k.run(['ask', '--questions', questions, '--timeout', '600']);
+    const first = await k.asked();
+    expect(first.text).toContain('Вопрос 1 из 2');
+    const id = first.buttons![0]![0]!.data.split(':')[1] as string;
+    await k.press(`b:${id}:1:B`);
+    await k.reply('80');
+    expect(await running).toMatchObject({
+      code: 0,
+      json: {
+        id,
+        status: 'answered',
+        items: [
+          { item: 1, by: 'human', option: 'B', text: 'JSON' },
+          { item: 2, by: 'human', text: '80' },
+        ],
+      },
+    });
+  });
+
+  test('перевод в терминал — status terminal, код 3; answered --answers закрывает', async () => {
+    const k = setup();
+    const running = k.run(['ask', '--questions', questions, '--timeout', '600']);
+    const first = await k.asked();
+    const id = first.buttons![0]![0]!.data.split(':')[1] as string;
+    await k.press(`t:${id}`);
+    expect(await running).toMatchObject({ code: 3, json: { id, status: 'terminal' } });
+    const done = await k.run(['answered', id, '--answers', '[{"item":1,"option":"A"},{"item":2,"text":"80"}]']);
+    expect(done.json).toMatchObject({
+      status: 'answered',
+      items: [
+        { item: 1, option: 'A' },
+        { item: 2, text: '80' },
+      ],
+    });
+  });
+
+  test('decide --answers; to-terminal без id — открытые вопросы сессии; неверный JSON — код 1', async () => {
+    const k = setup();
+    const id = (await k.run(['ask', '--questions', questions, '--timeout', '0'])).json.id;
+    const decided = await k.run(['decide', id, '--answers', '[{"item":2,"text":"80"}]', '--reason', 'по таймауту']);
+    expect(decided.json).toMatchObject({
+      status: 'decided',
+      items: [
+        { item: 1, option: 'A' },
+        { item: 2, text: '80' },
+      ],
+    });
+
+    const open = (await k.run(['ask', '--questions', questions, '--timeout', '0'])).json.id;
+    const moved = await k.run(['to-terminal']);
+    expect(moved).toMatchObject({ code: 0 });
+    expect((moved.json as { id: string }[]).map((q) => q.id)).toEqual([open]);
+
+    expect((await k.run(['ask', '--questions', '{'])).code).toBe(1);
+    expect((await k.run(['ask', 'текст', '--questions', questions])).code).toBe(1);
+    expect((await k.run(['decide', id, '--answers', '[1]', '--reason', 'r'])).code).toBe(1);
+  });
+});
+
 describe('herald decide', () => {
   test('вариант с причиной — JSON вопроса, сообщение обновлено (КП 3)', async () => {
     const k = setup();

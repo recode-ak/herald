@@ -1,4 +1,4 @@
-import type { AskRequest } from '../client/client.ts';
+import type { AskItem, AskRequest } from '../client/client.ts';
 import type { InboxKind } from '../domain/inbox.ts';
 import type { Choice } from '../domain/question.ts';
 import type { InboxItemWire, QuestionWire } from '../http/wire.ts';
@@ -59,14 +59,16 @@ export class FakeHerald implements ChannelHerald {
   async ask(request: AskRequest): Promise<QuestionWire> {
     this.maybeFail();
     this.asked.push(request);
+    const items = 'questions' in request ? request.questions : [request];
+    const first = items[0] as AskItem;
     return {
       id: `q_${this.asked.length}`,
-      text: request.text,
-      options: request.options,
+      text: first.text,
+      options: first.options,
       status: 'open',
       askedAt: 0,
       lateAnswers: [],
-      items: [{ text: request.text, options: request.options, lateAnswers: [] }],
+      items: items.map((i) => ({ text: i.text, options: i.options, lateAnswers: [] })),
     };
   }
 

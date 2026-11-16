@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { JSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
+import type { AskItem } from '../client/client.ts';
 import { HeraldChannel, type Terminal } from './channel.ts';
 import { FakeHerald } from './herald.fake.ts';
 
@@ -300,7 +301,7 @@ describe('HeraldChannel — подтверждение действий из Tel
     channel.start();
     await relay(client);
     await until(() => herald.asked.length === 1);
-    const asked = herald.asked[0]!;
+    const asked = herald.asked[0] as AskItem;
     expect(asked.text).toContain('Bash');
     expect(asked.text).toContain('Удалить сборку');
     expect(asked.text).toContain('rm -rf dist');

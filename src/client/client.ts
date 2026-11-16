@@ -26,13 +26,21 @@ export interface HeraldClientOptions {
   chunkMs?: number;
 }
 
-export interface AskRequest {
+/** Пункт пачки в запросе. */
+export interface AskItem {
   text: string;
   options: QuestionOption[];
   recommended?: string;
+}
+
+/** Ответ на пункт пачки в запросе (нумерация с 1). */
+export type ItemAnswerRequest = { item: number } & ({ option: string } | { text: string });
+
+/** Одиночный вопрос (поля пункта) или пачка (`questions`); `timeoutMs` — на весь вопрос. */
+export type AskRequest = (AskItem | { questions: AskItem[] }) & {
   /** Сколько агент ждёт, прежде чем решить сам; без него решать будет нельзя. */
   timeoutMs?: number;
-}
+};
 
 /**
  * HTTP-клиент herald — общий для CLI и канала. Long poll: ожидание переподключается до своего таймаута,
@@ -68,25 +76,35 @@ export class HeraldClient {
     return ((await this.call('/v1/ask', { ...request })) as { question: QuestionWire }).question;
   }
 
-  /** Человек ответил в терминале агента: закрыть вопрос его ответом. */
-  async answered(id: string, choice: Choice): Promise<QuestionWire> {
-    return ((await this.call('/v1/answered', { id, ...choice })) as { question: QuestionWire }).question;
+  /** Человек ответил в терминале агента: закрыть вопрос (или пункты пачки) его ответами. */
+  async answered(id: string, answers: Choice | readonly ItemAnswerRequest[]): Promise<QuestionWire> {
+    return ((await this.call('/v1/answered', { id, ...HeraldClient.answers(answers) })) as { question: QuestionWire })
+      .question;
   }
 
-  async decide(id: string, choice: Choice, reason: string): Promise<QuestionWire> {
-    return ((await this.call('/v1/decide', { id, ...choice, reason })) as { question: QuestionWire }).question;
+  /** Решение агента: ответ (одиночный вопрос) или ответы по пунктам; пункты без ответа — рекомендованные. */
+  async decide(id: string, answers: Choice | readonly ItemAnswerRequest[], reason: string): Promise<QuestionWire> {
+    return (
+      (await this.call('/v1/decide', { id, ...HeraldClient.answers(answers), reason })) as { question: QuestionWire }
+    ).question;
+  }
+
+  /** Человек ответит в терминале: вопрос `id` или все открытые вопросы сессии. */
+  async toTerminal(id?: string): Promise<QuestionWire[]> {
+    return ((await this.call('/v1/to-terminal', id !== undefined ? { id } : {})) as { questions: QuestionWire[] })
+      .questions;
   }
 
   async ack(ids: readonly string[]): Promise<string[]> {
     return ((await this.call('/v1/ack', { ids })) as { read: string[] }).read;
   }
 
-  /** Ждать ответа до `timeoutMs` (без него — бесконечно). По таймауту — вопрос в `open`. */
+  /** Ждать ответа или перевода в терминал до `timeoutMs` (без него — бесконечно). По таймауту — вопрос в `open`. */
   async awaitQuestion(id: string, timeoutMs?: number): Promise<QuestionWire> {
     return this.poll(
       timeoutMs,
       async (waitMs) => ((await this.call('/v1/question', { id, waitMs })) as { question: QuestionWire }).question,
-      (q) => q.status !== 'open',
+      (q) => q.status !== 'open' || q.terminalAt !== undefined,
     );
   }
 
@@ -99,6 +117,10 @@ export class HeraldClient {
         ((await this.call('/v1/inbox', { waitMs: chunk, ...filter })) as { items: InboxItemWire[] }).items,
       (items) => items.length > 0,
     );
+  }
+
+  private static answers(answers: Choice | readonly ItemAnswerRequest[]): Record<string, unknown> {
+    return Array.isArray(answers) ? { answers } : { ...(answers as Choice) };
   }
 
   /** Повторять ожидающий запрос кусками до результата или таймаута (`undefined` — бесконечно). */

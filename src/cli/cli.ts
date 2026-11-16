@@ -1,8 +1,14 @@
 import type { Clock } from '../app/ports.ts';
-import { HeraldClient, HeraldClientError } from '../client/client.ts';
+import {
+  type AskItem,
+  type AskRequest,
+  HeraldClient,
+  HeraldClientError,
+  type ItemAnswerRequest,
+} from '../client/client.ts';
 import { ClientConfig, ClientConfigError } from '../client/config.ts';
 import { SessionLocator } from '../client/locator.ts';
-import type { Choice, QuestionOption } from '../domain/question.ts';
+import type { Choice, QuestionOption, Resolution } from '../domain/question.ts';
 import type { QuestionWire } from '../http/wire.ts';
 import { Args, type ArgsSpec, UsageError } from './args.ts';
 
@@ -14,14 +20,27 @@ export interface CliDeps {
   err: (text: string) => void;
 }
 
-/** Ответ на вопрос в выводе CLI. `timeout` — ответа нет (код 2). */
+/** Ответ на пункт в выводе CLI. */
+export interface ItemResult {
+  item: number;
+  by: 'human' | 'agent';
+  option?: string;
+  text?: string;
+  reason?: string;
+}
+
+/**
+ * Ответ на вопрос в выводе CLI. `timeout` — ответа нет (код 2), `terminal` — человек перевёл вопрос в терминал
+ * (код 3: спроси у себя и закрой `herald answered`). У пачки — ответы по пунктам в `items`.
+ */
 export interface AskResult {
   id: string;
-  status: 'answered' | 'decided' | 'timeout';
+  status: 'answered' | 'decided' | 'timeout' | 'terminal';
   by?: 'human' | 'agent';
   option?: string;
   text?: string;
   reason?: string;
+  items?: ItemResult[];
 }
 
 const USAGE = `herald — вопросы и уведомления человеку через Telegram
@@ -32,15 +51,25 @@ const USAGE = `herald — вопросы и уведомления челове�
   herald ask <вопрос> [-o "A: текст"]… [--recommended A] [--timeout <с>]
                                                 вопрос; ждёт ответа (без --timeout — бесконечно,
                                                 и decide по нему запрещён)
-  herald decide <id> (<вариант> | --text <текст>) --reason <причина>
-                                                решение агента (например, по таймауту)
-  herald answered <id> (<вариант> | --text <текст>)
+  herald ask --questions '<JSON>' [--timeout <с>]
+                                                пачка связанных вопросов: человек получает их
+                                                по одному, ответы — все сразу (items в выводе);
+                                                JSON — [{ "text", "options": [{ "id", "text" }], "recommended" }]
+  herald decide <id> (<вариант> | --text <текст> | --answers '<JSON>') --reason <причина>
+                                                решение агента (например, по таймауту); у пачки —
+                                                --answers '[{ "item": 2, "text": "…" }]', прочие пункты —
+                                                рекомендованные ('[]' — все)
+  herald answered <id> (<вариант> | --text <текст> | --answers '<JSON>')
                                                 человек ответил в терминале: закрыть вопрос
-  herald inbox [--wait <с>] [--ack]             входящие: ответы, поздние ответы, указания
+  herald to-terminal [<id>]                     человек ответит в терминале: вопрос или все
+                                                открытые вопросы сессии уходят из Telegram
+  herald inbox [--wait <с>] [--ack]             входящие: ответы, поздние ответы, указания,
+                                                переводы в терминал
   herald ack <id>…                              подтвердить прочтение входящих
 
   Общие: --session <имя> (или HERALD_SESSION) — явная сессия вместо корня git.
-  Вывод — JSON в stdout. Коды: 0 — готово, 2 — ask без ответа по таймауту, 1 — ошибка.
+  Вывод — JSON в stdout. Коды: 0 — готово, 2 — ask без ответа по таймауту,
+  3 — ask переведён в терминал (спроси у себя, закрой herald answered), 1 — ошибка.
   Настройки: ~/.config/herald/config.json { serverUrl, token, host } или HERALD_URL, HERALD_TOKEN, HERALD_HOST.
 `;
 
@@ -70,6 +99,8 @@ export class Cli {
           return await this.decide(rest);
         case 'answered':
           return await this.answered(rest);
+        case 'to-terminal':
+          return await this.toTerminal(rest);
         case 'inbox':
           return await this.inbox(rest);
         case 'ack':
@@ -109,44 +140,50 @@ export class Cli {
   }
 
   private async ask(argv: readonly string[]): Promise<number> {
-    const args = this.parse(argv, { values: ['recommended', 'timeout'], lists: ['o', 'option'] });
-    const options = [...args.list('o'), ...args.list('option')].map(Cli.option);
-    const recommended = args.value('recommended');
+    const args = this.parse(argv, { values: ['recommended', 'timeout', 'questions'], lists: ['o', 'option'] });
     const timeoutMs = args.seconds('timeout');
     const client = this.client(args);
-    const asked = await client.ask({
-      text: Cli.text(args, 'текст вопроса'),
-      options,
-      ...(recommended !== undefined && { recommended }),
-      ...(timeoutMs !== undefined && { timeoutMs }),
-    });
+    const raw = args.value('questions');
+    let question: AskRequest;
+    if (raw !== undefined) {
+      if (args.positional.length > 0 || args.list('o').length > 0 || args.list('option').length > 0) {
+        throw new UsageError('ask: --questions — вместо текста вопроса и -o');
+      }
+      question = { questions: Cli.questions(raw) };
+    } else {
+      const options = [...args.list('o'), ...args.list('option')].map(Cli.option);
+      const recommended = args.value('recommended');
+      question = {
+        text: Cli.text(args, 'текст вопроса'),
+        options,
+        ...(recommended !== undefined && { recommended }),
+      };
+    }
+    const asked = await client.ask({ ...question, ...(timeoutMs !== undefined && { timeoutMs }) });
     const result = Cli.result(await client.awaitQuestion(asked.id, timeoutMs));
     this.print(result);
-    return result.status === 'timeout' ? 2 : 0;
+    return result.status === 'timeout' ? 2 : result.status === 'terminal' ? 3 : 0;
   }
 
   private async decide(argv: readonly string[]): Promise<number> {
-    const args = this.parse(argv, { values: ['text', 'reason'] });
-    const [id, option, ...extra] = args.positional;
-    if (!id) throw new UsageError('decide: нужен id вопроса');
-    if (extra.length > 0) throw new UsageError('decide: лишние аргументы');
-    const text = args.value('text');
-    if ((option === undefined) === (text === undefined)) throw new UsageError('decide: нужен вариант или --text');
+    const args = this.parse(argv, { values: ['text', 'reason', 'answers'] });
+    const { id, answers } = Cli.answersOf(args, 'decide');
     const reason = args.value('reason');
     if (!reason?.trim()) throw new UsageError('decide: нужна --reason');
-    const choice: Choice = option !== undefined ? { option } : { text: text as string };
-    return this.print(Cli.result(await this.client(args).decide(id, choice, reason)));
+    return this.print(Cli.result(await this.client(args).decide(id, answers, reason)));
   }
 
   private async answered(argv: readonly string[]): Promise<number> {
-    const args = this.parse(argv, { values: ['text'] });
-    const [id, option, ...extra] = args.positional;
-    if (!id) throw new UsageError('answered: нужен id вопроса');
-    if (extra.length > 0) throw new UsageError('answered: лишние аргументы');
-    const text = args.value('text');
-    if ((option === undefined) === (text === undefined)) throw new UsageError('answered: нужен вариант или --text');
-    const choice: Choice = option !== undefined ? { option } : { text: text as string };
-    return this.print(Cli.result(await this.client(args).answered(id, choice)));
+    const args = this.parse(argv, { values: ['text', 'answers'] });
+    const { id, answers } = Cli.answersOf(args, 'answered');
+    return this.print(Cli.result(await this.client(args).answered(id, answers)));
+  }
+
+  private async toTerminal(argv: readonly string[]): Promise<number> {
+    const args = this.parse(argv, {});
+    const [id, ...extra] = args.positional;
+    if (extra.length > 0) throw new UsageError('to-terminal: лишние аргументы');
+    return this.print(await this.client(args).toTerminal(id));
   }
 
   private async inbox(argv: readonly string[]): Promise<number> {
@@ -210,13 +247,91 @@ export class Cli {
     return { id, text };
   }
 
+  /** id и ответ: `<вариант>`, `--text` или `--answers '<JSON>'` — ровно одно. */
+  private static answersOf(args: Args, command: string): { id: string; answers: Choice | ItemAnswerRequest[] } {
+    const [id, option, ...extra] = args.positional;
+    if (!id) throw new UsageError(`${command}: нужен id вопроса`);
+    if (extra.length > 0) throw new UsageError(`${command}: лишние аргументы`);
+    const text = args.value('text');
+    const raw = args.value('answers');
+    const given = [option, text, raw].filter((v) => v !== undefined).length;
+    if (given !== 1) throw new UsageError(`${command}: нужен вариант, --text или --answers`);
+    if (raw !== undefined) return { id, answers: Cli.itemAnswers(raw) };
+    return { id, answers: option !== undefined ? { option } : { text: text as string } };
+  }
+
+  /** `--questions`: `[{ text, options?, recommended? }]`. */
+  private static questions(raw: string): AskItem[] {
+    const value = Cli.json(raw, '--questions');
+    const ok =
+      Array.isArray(value) &&
+      value.every(
+        (q) =>
+          Cli.isObject(q) &&
+          typeof q.text === 'string' &&
+          (q.recommended === undefined || typeof q.recommended === 'string') &&
+          (q.options === undefined ||
+            (Array.isArray(q.options) &&
+              q.options.every((o) => Cli.isObject(o) && typeof o.id === 'string' && typeof o.text === 'string'))),
+      );
+    if (!ok) throw new UsageError('--questions — ожидается [{ "text", "options": [{ "id", "text" }], "recommended" }]');
+    return (value as Record<string, unknown>[]).map((q) => ({
+      text: q.text as string,
+      options: (q.options as QuestionOption[] | undefined)?.map((o) => ({ id: o.id, text: o.text })) ?? [],
+      ...(q.recommended !== undefined && { recommended: q.recommended as string }),
+    }));
+  }
+
+  /** `--answers`: `[{ item, option | text }]`. */
+  private static itemAnswers(raw: string): ItemAnswerRequest[] {
+    const value = Cli.json(raw, '--answers');
+    const ok =
+      Array.isArray(value) &&
+      value.every(
+        (a) =>
+          Cli.isObject(a) &&
+          Number.isSafeInteger(a.item) &&
+          (typeof a.option === 'string') !== (typeof a.text === 'string'),
+      );
+    if (!ok) throw new UsageError('--answers — ожидается [{ "item": 1, "option": "A" } | { "item": 2, "text": "…" }]');
+    return (value as Record<string, unknown>[]).map((a) =>
+      typeof a.option === 'string'
+        ? { item: a.item as number, option: a.option }
+        : { item: a.item as number, text: a.text as string },
+    );
+  }
+
+  private static json(raw: string, flag: string): unknown {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      throw new UsageError(`${flag} — не JSON`);
+    }
+  }
+
+  private static isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
   private static result(q: QuestionWire): AskResult {
+    if (q.status === 'open') return { id: q.id, status: q.terminalAt !== undefined ? 'terminal' : 'timeout' };
+    if (q.items.length > 1) {
+      return {
+        id: q.id,
+        status: q.status,
+        items: q.items.flatMap((it, i) => (it.resolution ? [Cli.itemResult(i + 1, it.options, it.resolution)] : [])),
+      };
+    }
     const r = q.resolution;
-    if (q.status === 'open' || !r) return { id: q.id, status: 'timeout' };
-    const text = r.text ?? q.options.find((o) => o.id === r.option)?.text;
+    if (!r) return { id: q.id, status: 'timeout' };
+    const { item: _, ...flat } = Cli.itemResult(1, q.options, r);
+    return { id: q.id, status: q.status, ...flat };
+  }
+
+  private static itemResult(item: number, options: readonly QuestionOption[], r: Resolution): ItemResult {
+    const text = r.text ?? options.find((o) => o.id === r.option)?.text;
     return {
-      id: q.id,
-      status: q.status,
+      item,
       by: r.by,
       ...(r.option !== undefined && { option: r.option }),
       ...(text !== undefined && { text }),
