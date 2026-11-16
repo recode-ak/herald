@@ -71,7 +71,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: `docs/model.md` — команды CLI (95dacbd)
 - [x] Task: Conductor - User Manual Verification 'Фаза 4: CLI' (b126195) (Protocol in workflow.md)
 
-## Фаза 5: Channel для Claude Code
+## Фаза 5: Channel для Claude Code [checkpoint: 3314886]
 
 Критерии фазы: MCP-сервер канала объявляет `claude/channel`, отдаёт инструменты, доставляет входящие событиями и подтверждает прочтение; подтверждение действий — по настройке; `docs/install.md` описывает подключение.
 
@@ -83,7 +83,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] Тесты: `permission_request` → вопрос «разрешить / запретить» → `notifications/claude/channel/permission`; выключено по умолчанию
     - [x] Реализация
 - [x] Task: `docs/install.md` — подключение канала (`.mcp.json`, флаг запуска, ограничения research preview) (6c33a80)
-- [x] Task: Conductor - User Manual Verification 'Фаза 5: Channel для Claude Code' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 5: Channel для Claude Code' (3314886) (Protocol in workflow.md)
 
 ## Фаза 6: Деплой и установка
 
