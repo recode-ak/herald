@@ -8,6 +8,7 @@ import { Notices } from './notices.ts';
 import { type Clock, ForbiddenError, type Ids, NotFoundError } from './ports.ts';
 import type { Store } from './store.ts';
 import type { TelegramPort, TelegramUpdate } from './telegram.ts';
+import { Waiter } from './waiter.ts';
 
 export interface HumanDeps {
   store: Store;
@@ -15,6 +16,7 @@ export interface HumanDeps {
   access: Access;
   clock: Clock;
   ids: Ids;
+  waiter: Waiter;
   /** Сессия активна, пока с последнего обращения агента прошло не больше окна. */
   activeWindowMs: number;
 }
@@ -119,6 +121,9 @@ export class HumanService {
     });
     await this.notices.refreshQuestion(question, session);
     await this.notices.queued(item, session, update.chatId, update.messageId);
+    // Будим после отметки «в ящике»: иначе агент прочтёт раньше, чем она появится, и «прочитано» не встанет.
+    this.deps.waiter.notify(Waiter.questionTopic(questionId));
+    this.deps.waiter.notify(Waiter.sessionTopic(session.key));
     const label = resolution.option ?? 'ответ принят';
     return outcome === 'answer' ? `Принят ${label}` : `Переигрывание вопроса ${questionId}: ${label}`;
   }
@@ -153,6 +158,7 @@ export class HumanService {
     );
     this.deps.store.saveInboxItem(item);
     await this.notices.queued(item, session, update.chatId, update.messageId);
+    this.deps.waiter.notify(Waiter.sessionTopic(sessionKey));
     return undefined;
   }
 

@@ -2,15 +2,41 @@ import { Access } from '../domain/access.ts';
 import { SqliteStore } from '../infra/sqlite-store.ts';
 import type { Clock, Ids } from './ports.ts';
 import { FakeTelegram } from './telegram.fake.ts';
+import { Waiter } from './waiter.ts';
 
-/** Часы, которые двигает тест. */
+/** Часы, которые двигает тест: `advance` будит тех, чей срок настал. */
 export class ManualClock implements Clock {
+  private readonly sleeping = new Set<{ until: number; wake: () => void }>();
+
   constructor(private t = 1_000_000) {}
+
   now(): number {
     return this.t;
   }
+
+  sleep(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve) => {
+      const sleeper = {
+        until: this.t + ms,
+        wake: () => {
+          this.sleeping.delete(sleeper);
+          resolve();
+        },
+      };
+      if (signal.aborted) return resolve();
+      this.sleeping.add(sleeper);
+      signal.addEventListener('abort', sleeper.wake, { once: true });
+    });
+  }
+
   advance(ms: number): void {
     this.t += ms;
+    for (const sleeper of [...this.sleeping]) if (sleeper.until <= this.t) sleeper.wake();
+  }
+
+  /** Сколько снов ещё не завершилось. */
+  get sleepers(): number {
+    return this.sleeping.size;
   }
 }
 
@@ -29,12 +55,14 @@ export const ANN_CHAT = 222;
 
 /** Общий набор для тестов сценариев: SQLite в памяти, фейковый Telegram, два человека. */
 export function testkit() {
+  const clock = new ManualClock();
   return {
     store: SqliteStore.open(':memory:'),
     telegram: new FakeTelegram(),
     access: Access.parse('nur:t-nur,ann:t-ann', `nur:${NUR_CHAT},ann:${ANN_CHAT}`),
-    clock: new ManualClock(),
+    clock,
     ids: new SeqIds(),
+    waiter: new Waiter(clock),
   };
 }
 

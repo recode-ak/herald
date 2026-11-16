@@ -1,9 +1,11 @@
 import type { PersonId } from '../domain/access.ts';
 import type { SessionRef } from '../domain/session.ts';
 
-/** Часы: мс эпохи. */
+/** Часы: мс эпохи и сон с отменой. */
 export interface Clock {
   now(): number;
+  /** Завершается через `ms` или сразу при отмене `signal`. */
+  sleep(ms: number, signal: AbortSignal): Promise<void>;
 }
 
 /** Генератор идентификаторов: `next('q')` → `q_…`. */

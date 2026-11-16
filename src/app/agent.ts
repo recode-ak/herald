@@ -8,6 +8,7 @@ import { Notices } from './notices.ts';
 import { type Caller, type Clock, ForbiddenError, type Ids, NotFoundError } from './ports.ts';
 import type { Store } from './store.ts';
 import type { TelegramPort } from './telegram.ts';
+import { Waiter } from './waiter.ts';
 
 export interface AgentDeps {
   store: Store;
@@ -15,6 +16,7 @@ export interface AgentDeps {
   access: Access;
   clock: Clock;
   ids: Ids;
+  waiter: Waiter;
 }
 
 export interface AskInput {
@@ -96,10 +98,44 @@ export class AgentService {
     return read.map((i) => i.id);
   }
 
-  /** Вопрос вызывающего человека. */
-  question(caller: Caller, questionId: string): Question {
-    this.enter(caller);
-    return this.ownQuestion(caller, questionId);
+  /**
+   * Ждать ответа на вопрос до `timeoutMs`; возвращает вопрос (открытый — по таймауту).
+   * Ответ человека, полученный так, отмечается прочитанным — во входящих он не повторится.
+   */
+  async awaitQuestion(caller: Caller, questionId: string, timeoutMs: number): Promise<Question> {
+    const session = this.enter(caller);
+    const deadline = this.deps.clock.now() + timeoutMs;
+    for (;;) {
+      const question = this.ownQuestion(caller, questionId);
+      if (question.status !== 'open') {
+        const answers = this.deps.store
+          .inbox(session.key)
+          .pending()
+          .filter((i) => i.kind === 'answer' && i.questionId === questionId);
+        if (answers.length > 0)
+          await this.ack(
+            caller,
+            answers.map((i) => i.id),
+          );
+        return question;
+      }
+      if (!(await this.deps.waiter.wait(Waiter.questionTopic(questionId), deadline - this.deps.clock.now()))) {
+        return this.ownQuestion(caller, questionId);
+      }
+    }
+  }
+
+  /** Ждать входящих до `timeoutMs`: непрочитанные сразу, иначе — первые пришедшие; по таймауту — пусто. */
+  async awaitInbox(caller: Caller, timeoutMs: number): Promise<InboxItem[]> {
+    const session = this.enter(caller);
+    const deadline = this.deps.clock.now() + timeoutMs;
+    for (;;) {
+      const pending = this.deps.store.inbox(session.key).pending();
+      if (pending.length > 0) return pending;
+      if (!(await this.deps.waiter.wait(Waiter.sessionTopic(session.key), deadline - this.deps.clock.now()))) {
+        return [];
+      }
+    }
   }
 
   /** Зарегистрировать или отметить активной сессию вызывающего. */
