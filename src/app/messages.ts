@@ -185,6 +185,8 @@ export class Messages {
   static readonly NO_SESSIONS = 'Сессий на связи нет.';
   static readonly UNKNOWN_COMMAND = 'Неизвестная команда. Есть: /sessions, /status, /clear, /compact.';
   static readonly WHOM = 'Кому? Ответь reply на сообщение сессии или выбери адресата в /sessions.';
+  /** Кнопка вопроса, которого больше нет: удалён очисткой по сроку хранения. */
+  static readonly QUESTION_GONE = '⚠️ вопрос устарел и удалён';
 
   static ago(at: number, now: number): string {
     const minutes = Math.floor((now - at) / 60_000);

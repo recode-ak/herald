@@ -61,6 +61,7 @@ export class HumanService {
 
   private async onCallback(person: PersonId, update: CallbackUpdate): Promise<string> {
     const [kind, id, ...rest] = update.data.split(':');
+    if ((kind === 'a' || kind === 'h') && id && !this.deps.store.question(id)) return Messages.QUESTION_GONE;
     if (kind === 'a' && id && rest.length > 0) return this.answer(person, id, { option: rest.join(':') }, update);
     if (kind === 'h' && id && rest.length === 0) return this.hold(person, id);
     if (kind === 's' && id && rest.length === 0) return this.select(person, update.chatId, id);

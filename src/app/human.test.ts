@@ -402,4 +402,17 @@ describe('Доступ (КП 7)', () => {
     await k.press(NUR_CHAT, 1, 'zzz');
     expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('⚠️ кнопка устарела');
   });
+
+  test('кнопка вопроса, удалённого очисткой, — «вопрос устарел и удалён»', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, db);
+    const qMsg = k.telegram.last(NUR_CHAT)!;
+    k.store.purge(Number.MAX_SAFE_INTEGER);
+    expect(k.store.question(q.id)).toBeUndefined();
+
+    await k.press(NUR_CHAT, qMsg.messageId, `a:${q.id}:B`);
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('⚠️ вопрос устарел и удалён');
+    await k.press(NUR_CHAT, qMsg.messageId, `h:${q.id}`);
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('⚠️ вопрос устарел и удалён');
+  });
 });
