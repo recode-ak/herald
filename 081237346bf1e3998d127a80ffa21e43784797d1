@@ -1,0 +1,11 @@
+Отчёт о верификации Фазы 2: Хранилище и сценарии.
+
+Автотесты: CI=true bun run check — biome, tsc --noEmit, bun test: 122 pass, 0 fail; покрытие src ≈ 100% строк.
+Тестовые файлы для кода фазы: sqlite-store, system, telegram.fake, agent, human, wait, waiter, messages (добавлен на контрольной точке). Без отдельного теста: notices.ts (100% через agent/human, включая сбои Telegram), store.ts/telegram.ts/ports.ts (порты и типы).
+
+Критерии фазы: сценарии ФТ 1–8, 10 работают на SQLite :memory: и FakeTelegram — notify/ask/decide/status/inbox/ack (agent.test), кнопки, reply, поздние ответы, /sessions, /status, отметки (human.test), ожидание (wait.test); доступ по человеку — human.test «Доступ (КП 7)», agent.test (сессия/вопрос другого человека).
+
+План ручной проверки (Автопилот — считается пройденным; живой Telegram — в Фазе 6):
+1. bun test src/app/human.test.ts src/app/wait.test.ts — все зелёные.
+2. Прочитать docs/model.md, разделы «Бот» и «Ожидание» — совпадают с ожиданиями от поведения бота.
+Подтверждение пользователя: по инструкции «Автопилот» не запрашивалось.
