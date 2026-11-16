@@ -1,0 +1,2 @@
+Задача: docs/install.md — подключение канала (Фаза 5).
+docs/install.md: клиент CLI (5 команд: clone, bun install, link, config.json, проверка notify), канал — claude mcp add --scope user или .mcp.json, флаг --dangerously-load-development-channels server:herald, разрешения mcp__herald__*, переменные HERALD_SESSION и HERALD_PERMISSION_RELAY, ограничения research preview. docs/model.md: раздел «Канал» — инструменты, события meta, подтверждение действий. README — ссылка на install.md. Раздел сервера в install.md — заглушка до Фазы 6.
