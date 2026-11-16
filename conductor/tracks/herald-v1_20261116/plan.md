@@ -2,7 +2,7 @@
 
 Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.md): TDD (red → green), коммит на задачу, протокол фазы. КП — критерии приёмки spec.
 
-## Фаза 1: Каркас и домен
+## Фаза 1: Каркас и домен [checkpoint: 07cabfe]
 
 Критерии фазы: `bun run check` зелёный; домен (сессия, вопрос, входящие, доступ) покрыт тестами, без ввода-вывода; `docs/model.md` описывает сущности и состояния.
 
@@ -22,7 +22,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] Тесты: виды `answer`, `late-answer`, `directive`; состояния `queued → read`; порядок выдачи; принадлежность сессии
     - [x] Реализация `src/domain/inbox`
 - [x] Task: `docs/model.md` — сущности, состояния, правила (9d59612)
-- [ ] Task: Conductor - User Manual Verification 'Фаза 1: Каркас и домен' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 1: Каркас и домен' (07cabfe) (Protocol in workflow.md)
 
 ## Фаза 2: Хранилище и сценарии
 
