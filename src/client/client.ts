@@ -73,26 +73,25 @@ export class HeraldClient {
   }
 
   async ask(request: AskRequest): Promise<QuestionWire> {
-    return ((await this.call('/v1/ask', { ...request })) as { question: QuestionWire }).question;
+    return HeraldClient.question(await this.call('/v1/ask', { ...request }));
   }
 
   /** Человек ответил в терминале агента: закрыть вопрос (или пункты пачки) его ответами. */
   async answered(id: string, answers: Choice | readonly ItemAnswerRequest[]): Promise<QuestionWire> {
-    return ((await this.call('/v1/answered', { id, ...HeraldClient.answers(answers) })) as { question: QuestionWire })
-      .question;
+    return HeraldClient.question(await this.call('/v1/answered', { id, ...HeraldClient.answers(answers) }));
   }
 
   /** Решение агента: ответ (одиночный вопрос) или ответы по пунктам; пункты без ответа — рекомендованные. */
   async decide(id: string, answers: Choice | readonly ItemAnswerRequest[], reason: string): Promise<QuestionWire> {
-    return (
-      (await this.call('/v1/decide', { id, ...HeraldClient.answers(answers), reason })) as { question: QuestionWire }
-    ).question;
+    return HeraldClient.question(await this.call('/v1/decide', { id, ...HeraldClient.answers(answers), reason }));
   }
 
   /** Человек ответит в терминале: вопрос `id` или все открытые вопросы сессии. */
   async toTerminal(id?: string): Promise<QuestionWire[]> {
-    return ((await this.call('/v1/to-terminal', id !== undefined ? { id } : {})) as { questions: QuestionWire[] })
-      .questions;
+    const { questions } = (await this.call('/v1/to-terminal', id !== undefined ? { id } : {})) as {
+      questions: QuestionWire[];
+    };
+    return questions.map(HeraldClient.withItems);
   }
 
   async ack(ids: readonly string[]): Promise<string[]> {
@@ -103,7 +102,7 @@ export class HeraldClient {
   async awaitQuestion(id: string, timeoutMs?: number): Promise<QuestionWire> {
     return this.poll(
       timeoutMs,
-      async (waitMs) => ((await this.call('/v1/question', { id, waitMs })) as { question: QuestionWire }).question,
+      async (waitMs) => HeraldClient.question(await this.call('/v1/question', { id, waitMs })),
       (q) => q.status !== 'open' || q.terminalAt !== undefined,
     );
   }
@@ -117,6 +116,28 @@ export class HeraldClient {
         ((await this.call('/v1/inbox', { waitMs: chunk, ...filter })) as { items: InboxItemWire[] }).items,
       (items) => items.length > 0,
     );
+  }
+
+  private static question(body: unknown): QuestionWire {
+    return HeraldClient.withItems((body as { question: QuestionWire }).question);
+  }
+
+  /** Сервер до пачек (v6) не присылает `items` — одиночный вопрос из плоских полей. */
+  private static withItems(q: QuestionWire): QuestionWire {
+    if (Array.isArray(q.items)) return q;
+    const { text, options, recommended, resolution, lateAnswers } = q;
+    return {
+      ...q,
+      items: [
+        {
+          text,
+          options,
+          ...(recommended !== undefined && { recommended }),
+          ...(resolution && { resolution }),
+          lateAnswers,
+        },
+      ],
+    };
   }
 
   private static answers(answers: Choice | readonly ItemAnswerRequest[]): Record<string, unknown> {

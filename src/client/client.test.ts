@@ -70,6 +70,9 @@ function setup(maxWaitMs = 40) {
   return { telegram, calls, client, press, reply };
 }
 
+const k0 = (serverUrl: string) =>
+  new HeraldClient({ serverUrl, token: 't', session, clock: new SystemClock(), retryDelayMs: 5 });
+
 describe('HeraldClient', () => {
   test('notify, status, ask, decide — через HTTP API', async () => {
     const k = setup();
@@ -111,6 +114,32 @@ describe('HeraldClient', () => {
     ]);
     expect(answered.status).toBe('answered');
     expect((await c.toTerminal(q.id).catch((e: Error) => e.message)) as string).toContain('уже решён');
+  });
+
+  test('старый сервер (вопрос без items) — items из плоских полей: одиночный вопрос', async () => {
+    const old = {
+      id: 'q_1',
+      text: 'БД?',
+      options,
+      recommended: 'A',
+      status: 'answered',
+      askedAt: 1,
+      resolution: { by: 'human', option: 'B', at: 2 },
+      lateAnswers: [],
+    };
+    const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: () => Response.json({ question: old }) });
+    cleanup.push(() => server.stop(true));
+    const c = k0(`http://127.0.0.1:${server.port}`);
+    for (const q of [
+      await c.ask({ text: 'БД?', options }),
+      await c.decide('q_1', { option: 'B' }, 'r'),
+      await c.answered('q_1', { option: 'B' }),
+      await c.awaitQuestion('q_1', 1_000),
+    ]) {
+      expect(q.items).toEqual([
+        { text: 'БД?', options, recommended: 'A', resolution: { by: 'human', option: 'B', at: 2 }, lateAnswers: [] },
+      ]);
+    }
   });
 
   test('awaitQuestion переподключается, пока не придёт ответ', async () => {
