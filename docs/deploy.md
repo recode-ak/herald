@@ -10,6 +10,7 @@
 | Процесс | pm2 `herald`: `bun src/server/main.ts`, слушает `127.0.0.1:4518` (chronicle — 4517) |
 | Публикация | nginx `/etc/nginx/sites-available/herald.u7-hub.kz` → `https://herald.u7-hub.kz` (сертификат certbot) |
 | Бэкап | нет (решение 2026-11-16): в БД только оперативные сессии, вопросы и входящие; `backup.contract` нет — backup-orchestrator и offsite-backup herald не видят |
+| Очистка | служба server-ops `herald-retention` (cron раз в сутки): `bun run purge` в `/srv/herald`, срок — 14 дней (`HERALD_RETENTION_DAYS` не задан). Итог — `~/server-ops/state/herald-retention/status.json`, строка в отчётах health-check (`40-statusfiles`); сбой — алерт. Правила — `docs/model.md`, «Хранение» |
 | Мониторинг | health-check server-ops, только «жив»: `HEALTH_INTERNAL_SERVICES` в `~/server-ops/config/common.env` (порт 4518 слушается, pm2 `herald` online) |
 | Клиент на сервере | `~/.config/herald/config.json` (`serverUrl: http://127.0.0.1:4518`, `host: kalki-server`), `~/.local/bin/herald` |
 
@@ -51,7 +52,7 @@ ssh kalki_server
 cd /srv/herald && bash scripts/deploy.sh
 ```
 
-`git pull` → `bun install --production --frozen-lockfile` → `pm2 restart` → `/health`. Ждущие long poll при перезапуске обрываются — клиенты переподключаются сами.
+`git pull` → `bun install --production --frozen-lockfile` → `pm2 restart` → `/health`. Миграции схемы делает сервер при старте (и `bun run purge`, если он запустится раньше). Ждущие long poll при перезапуске обрываются — клиенты переподключаются сами.
 
 ## Оговорки
 
