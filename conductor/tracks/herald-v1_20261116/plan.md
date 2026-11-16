@@ -94,7 +94,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] DNS `herald.u7-hub.kz` → 89.167.20.233 (kalki-server)
     - [x] Репо `recode-ak/herald`, публичное (решение Нурболата 2026-11-16); локально `origin` = `git@github.com:recode-ak/herald.git`, репо пока пустое
 - [x] Task: Скрипты и документы деплоя — `scripts/deploy.sh`, `backup.contract`, `scripts/backup.sh`, `docs/deploy.md`, `docs/install.md` (сервер и клиент) (8b85778)
-- [~] Task: Выкатка на kalki-server — `/srv/herald`, `.env` (600), pm2; nginx и certbot — Нурболат (sudo); мониторинг health-check server-ops — по согласованию
+- [x] Task: Выкатка на kalki-server — `/srv/herald`, `.env` (600), pm2; nginx и certbot — Нурболат (sudo); мониторинг health-check server-ops — по согласованию (47bd7ef)
     - [x] Push `main` в `origin` — сделал Нурболат; `origin` = `github-kalki:recode-ak/herald.git` (ключ с доступом к recode-ak)
     - [x] `/srv/herald`: `git init` + `fetch` + `checkout main` поверх `.env`, `chmod 600 .env`
     - [x] `.env`: `HERALD_TOKENS` (ноутбук, сервер), `HERALD_PEOPLE`; конфиги клиента `~/.config/herald/config.json` (600) на ноутбуке и сервере
