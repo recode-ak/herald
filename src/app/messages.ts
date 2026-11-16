@@ -37,23 +37,19 @@ export class Messages {
     return text;
   }
 
-  /** Кнопки вариантов и «Жди меня». */
+  /** Кнопки вариантов (остаются для переигрывания) и «Жди меня» — пока вопрос открыт и не удержан. */
   static questionButtons(question: Question): Keyboard {
-    return [
-      ...question.options.map((o) => [
-        { text: `${o.id}${Messages.star(question, o.id)}`, data: `a:${question.id}:${o.id}` },
-      ]),
-      [{ text: 'Жди меня', data: `h:${question.id}` }],
-    ];
+    const options = question.options.map((o) => [
+      { text: `${o.id}${Messages.star(question, o.id)}`, data: `a:${question.id}:${o.id}` },
+    ]);
+    const canHold = question.status === 'open' && question.heldAt === undefined;
+    return canHold ? [...options, [{ text: 'Жди меня', data: `h:${question.id}` }]] : options;
   }
 
-  static inboxQueued(session: Session): string {
-    return `📥 в ящике сессии ${session.project}`;
-  }
-
-  static inboxRead(session: Session): string {
-    return `✅ прочитано агентом · сессия ${session.project}`;
-  }
+  /** Реакция на сообщение человека: входящее в ящике сессии. */
+  static readonly INBOX_QUEUED = '✍';
+  /** Реакция на сообщение человека: агент прочитал. */
+  static readonly INBOX_READ = '👀';
 
   /** Строка `/sessions`: давность активности и последний статус. */
   static sessionLine(session: Session, now: number): string {

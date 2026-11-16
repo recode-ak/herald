@@ -8,6 +8,8 @@ export interface FakeMessage extends OutgoingMessage {
 export class FakeTelegram implements TelegramPort {
   readonly edits: { chatId: number; messageId: number; text: string; buttons?: Keyboard }[] = [];
   readonly callbackAnswers: { callbackId: string; text?: string }[] = [];
+  /** Реакции в порядке постановки; сообщение человека в фейке не хранится — проверки нет. */
+  readonly reactions: { chatId: number; messageId: number; emoji: string }[] = [];
   private readonly messages = new Map<string, FakeMessage>();
   private nextId = 1;
   private failure: string | undefined;
@@ -32,6 +34,16 @@ export class FakeTelegram implements TelegramPort {
     if (buttons) message.buttons = buttons;
     else delete message.buttons;
     this.edits.push({ chatId, messageId, text, ...(buttons && { buttons }) });
+  }
+
+  async react(chatId: number, messageId: number, emoji: string): Promise<void> {
+    this.maybeFail();
+    this.reactions.push({ chatId, messageId, emoji });
+  }
+
+  /** Текущая реакция бота на сообщение. */
+  reaction(chatId: number, messageId: number): string | undefined {
+    return this.reactions.findLast((r) => r.chatId === chatId && r.messageId === messageId)?.emoji;
   }
 
   async answerCallback(callbackId: string, text?: string): Promise<void> {

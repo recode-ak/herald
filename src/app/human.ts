@@ -120,8 +120,9 @@ export class HumanService {
       store.saveInboxItem(item);
     });
     await this.notices.refreshQuestion(question, session);
-    await this.notices.queued(item, session, update.chatId, update.messageId);
-    // Будим после отметки «в ящике»: иначе агент прочтёт раньше, чем она появится, и «прочитано» не встанет.
+    // Кнопка: перерисованный вопрос и всплывающий ответ — уже квитанция. Текст reply — реакция на нём.
+    if (update.kind === 'message') await this.notices.queued(item, session, update.chatId, update.messageId);
+    // Будим после реакции «в ящике»: иначе агент прочтёт раньше, и «прочитано» её затрёт не по порядку.
     this.deps.waiter.notify(Waiter.questionTopic(questionId));
     this.deps.waiter.notify(Waiter.sessionTopic(session.key));
     const label = resolution.option ?? 'ответ принят';

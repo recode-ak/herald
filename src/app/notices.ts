@@ -7,7 +7,7 @@ import { TelegramError, type TelegramPort } from './telegram.ts';
 
 /**
  * Служебные правки в Telegram после того, как сценарий уже сохранил своё: обновить сообщение вопроса,
- * поставить и сменить отметку входящего. Best effort — сбой Telegram не отменяет сохранённое.
+ * поставить и сменить реакцию на сообщении человека. Best effort — сбой Telegram не отменяет сохранённое.
  */
 export class Notices {
   constructor(
@@ -24,18 +24,19 @@ export class Notices {
     }
   }
 
-  /** Отметка «в ящике сессии X» — reply на сообщение человека, связанная с входящим. */
-  async queued(item: InboxItem, session: Session, chatId: number, replyTo: number): Promise<void> {
-    await this.bestEffort(async () => {
-      const messageId = await this.telegram.send({ chatId, text: Messages.inboxQueued(session), replyTo });
-      this.store.saveLink({ chatId, messageId, sessionKey: session.key, inboxId: item.id });
-    });
+  /**
+   * Реакция «в ящике» на сообщение человека, из которого родилось входящее. Связь сообщения с входящим —
+   * для реакции «прочитано»; reply на это сообщение — указание той же сессии.
+   */
+  async queued(item: InboxItem, session: Session, chatId: number, messageId: number): Promise<void> {
+    this.store.saveLink({ chatId, messageId, sessionKey: session.key, inboxId: item.id });
+    await this.bestEffort(() => this.telegram.react(chatId, messageId, Messages.INBOX_QUEUED));
   }
 
-  /** Отметки входящего → «прочитано агентом». */
-  async read(item: InboxItem, session: Session): Promise<void> {
+  /** Реакция на сообщениях входящего → «прочитано». */
+  async read(item: InboxItem): Promise<void> {
     for (const link of this.store.linksOfInbox(item.id)) {
-      await this.bestEffort(() => this.telegram.edit(link.chatId, link.messageId, Messages.inboxRead(session)));
+      await this.bestEffort(() => this.telegram.react(link.chatId, link.messageId, Messages.INBOX_READ));
     }
   }
 

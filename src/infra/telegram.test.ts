@@ -66,6 +66,14 @@ describe('TelegramBotApi — исходящие', () => {
       { callback_query_id: 'cb2' },
     ]);
   });
+
+  test('setMessageReaction: одна эмодзи-реакция заменяет прежнюю', async () => {
+    const { fake, api } = setup();
+    await api.react(111, 42, '👀');
+    expect(fake.callsOf('setMessageReaction')).toEqual([
+      { chat_id: 111, message_id: 42, reaction: [{ type: 'emoji', emoji: '👀' }] },
+    ]);
+  });
 });
 
 describe('TelegramBotApi — ошибки и повторы', () => {

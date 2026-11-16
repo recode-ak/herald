@@ -85,6 +85,13 @@ async function sent(match: (m: Sent) => boolean): Promise<Sent> {
 }
 
 const textOf = (m: Sent) => String(m.params.text);
+/** Бот поставил реакцию `emoji` на сообщение `messageId`. */
+const reacted = (messageId: number, emoji: string) =>
+  fake
+    .callsOf('setMessageReaction')
+    .some(
+      (p) => p.message_id === messageId && JSON.stringify(p.reaction) === JSON.stringify([{ type: 'emoji', emoji }]),
+    );
 const buttonsOf = (m: Sent) =>
   (
     (m.params.reply_markup as { inline_keyboard: { text: string; callback_data: string }[][] }) ?? {
@@ -203,19 +210,20 @@ describe('КП 4: /status и /sessions без участия агента', () =
   });
 });
 
-describe('КП 5: указания только нужной сессии; отметки «в ящике» и «прочитано»', () => {
+describe('КП 5: указания только нужной сессии; реакции «в ящике» (✍) и «прочитано» (👀)', () => {
   test('reply на сообщение сессии', async () => {
     await herald(['notify', '--session', 'alpha', 'Готова альфа']);
     await herald(['notify', '--session', 'beta', 'Готова бета']);
     const alphaNotice = await sent((m) => textOf(m).endsWith('Готова альфа'));
 
     say('Альфа, займись тестами', alphaNotice.messageId);
-    await sent((m) => textOf(m) === '📥 в ящике сессии alpha');
+    const mine = userMessageId;
+    await until(() => reacted(mine, '✍'));
 
     const alpha = await herald(['inbox', '--session', 'alpha', '--wait', '5', '--ack']);
     expect(alpha.json).toMatchObject([{ kind: 'directive', text: 'Альфа, займись тестами' }]);
     expect((await herald(['inbox', '--session', 'beta'])).json).toEqual([]);
-    await until(() => fake.callsOf('editMessageText').some((p) => p.text === '✅ прочитано агентом · сессия alpha'));
+    await until(() => reacted(mine, '👀'));
   });
 
   test('выбор сессии в /sessions, затем текст', async () => {

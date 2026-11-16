@@ -43,7 +43,7 @@ function setup() {
 }
 
 describe('Ответы на вопрос', () => {
-  test('кнопка варианта → ответ во входящих, сообщение обновлено, отметка «в ящике»', async () => {
+  test('кнопка варианта → ответ во входящих, сообщение обновлено; отдельной отметки нет', async () => {
     const k = setup();
     const q = await k.agent.ask(nur, db);
     const qMsg = k.telegram.last(NUR_CHAT)!;
@@ -56,9 +56,8 @@ describe('Ответы на вопрос', () => {
     expect(k.telegram.message(NUR_CHAT, qMsg.messageId)?.text).toEndWith('\n\n👤 Принят B.');
     expect(k.telegram.callbackAnswers.at(-1)).toEqual({ callbackId: 'cb1', text: 'Принят B' });
 
-    const mark = k.telegram.last(NUR_CHAT)!;
-    expect(mark).toMatchObject({ text: '📥 в ящике сессии u7-school', replyTo: qMsg.messageId });
-    expect(k.store.link(NUR_CHAT, mark.messageId)).toMatchObject({ sessionKey: nurKey, inboxId: item!.id });
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(1);
+    expect(k.telegram.reactions).toEqual([]);
   });
 
   test('reply на вопрос → свободный ответ', async () => {
@@ -70,6 +69,9 @@ describe('Ответы на вопрос', () => {
     const [item] = await k.agent.inbox(nur);
     expect(item?.toState()).toMatchObject({ kind: 'answer', questionId: q.id, text: 'возьми Postgres, но позже' });
     expect(item?.option).toBeUndefined();
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(1);
+    expect(k.telegram.reaction(NUR_CHAT, 1001)).toBe('✍');
+    expect(k.store.link(NUR_CHAT, 1001)).toMatchObject({ sessionKey: nurKey, inboxId: item!.id });
   });
 
   test('ответ после decide → late-answer, первое решение сохранено', async () => {
@@ -101,7 +103,37 @@ describe('Ответы на вопрос', () => {
     await expect(k.agent.decide(nur, q.id, { option: 'A' }, 'по таймауту')).rejects.toThrow('просил ждать');
   });
 
-  test('«Жди меня» на решённом вопросе — подсказка, без ошибки', async () => {
+  test('«Жди меня» — только у открытого вопроса без удержания', async () => {
+    const k = setup();
+    const hasHold = (messageId: number) =>
+      k.telegram
+        .message(NUR_CHAT, messageId)
+        ?.buttons?.flat()
+        .some((b) => b.data.startsWith('h:'));
+    const answered = await k.agent.ask(nur, db);
+    const aMsg = k.telegram.last(NUR_CHAT)!.messageId;
+    const decided = await k.agent.ask(nur, db);
+    const dMsg = k.telegram.last(NUR_CHAT)!.messageId;
+    const held = await k.agent.ask(nur, db);
+    const hMsg = k.telegram.last(NUR_CHAT)!.messageId;
+    expect(hasHold(hMsg)).toBe(true);
+
+    await k.press(NUR_CHAT, aMsg, `a:${answered.id}:B`);
+    await k.agent.decide(nur, decided.id, { option: 'A' }, 'по таймауту');
+    await k.press(NUR_CHAT, hMsg, `h:${held.id}`);
+
+    for (const messageId of [aMsg, dMsg, hMsg]) {
+      expect(hasHold(messageId)).toBe(false);
+      expect(
+        k.telegram
+          .message(NUR_CHAT, messageId)
+          ?.buttons?.flat()
+          .map((b) => b.text),
+      ).toEqual(['A ⭐', 'B']);
+    }
+  });
+
+  test('«Жди меня» на решённом вопросе (старая кнопка) — подсказка, без ошибки', async () => {
     const k = setup();
     const q = await k.agent.ask(nur, db);
     await k.agent.decide(nur, q.id, { option: 'A' }, 'по таймауту');
@@ -121,14 +153,15 @@ describe('Указания', () => {
 
     expect((await k.agent.inbox(nur)).map((i) => [i.kind, i.text])).toEqual([['directive', 'не трогай миграции']]);
     expect(await k.agent.inbox(ops)).toEqual([]);
-    expect(k.telegram.last(NUR_CHAT)?.text).toBe('📥 в ящике сессии u7-school');
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(2);
+    expect(k.telegram.reaction(NUR_CHAT, 1001)).toBe('✍');
   });
 
-  test('reply на отметку «в ящике» — тоже указание той же сессии', async () => {
+  test('reply на своё указание — тоже указание той же сессии', async () => {
     const k = setup();
     await k.agent.notify(nur, 'x');
     await k.say(NUR_CHAT, 'раз', k.telegram.last(NUR_CHAT)!.messageId);
-    await k.say(NUR_CHAT, 'два', k.telegram.last(NUR_CHAT)!.messageId);
+    await k.say(NUR_CHAT, 'два', 1001);
     expect((await k.agent.inbox(nur)).map((i) => i.text)).toEqual(['раз', 'два']);
   });
 

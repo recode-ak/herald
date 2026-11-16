@@ -85,6 +85,14 @@ export class TelegramBotApi implements TelegramPort {
     }
   }
 
+  async react(chatId: number, messageId: number, emoji: string): Promise<void> {
+    await this.call('setMessageReaction', {
+      chat_id: chatId,
+      message_id: messageId,
+      reaction: [{ type: 'emoji', emoji }],
+    });
+  }
+
   async answerCallback(callbackId: string, text?: string): Promise<void> {
     await this.call('answerCallbackQuery', { callback_query_id: callbackId, ...(text !== undefined && { text }) });
   }

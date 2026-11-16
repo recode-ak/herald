@@ -26,6 +26,8 @@ export interface TelegramPort {
   send(message: OutgoingMessage): Promise<number>;
   /** Заменить текст и кнопки сообщения. Без `buttons` кнопки убираются. */
   edit(chatId: number, messageId: number, text: string, buttons?: Keyboard): Promise<void>;
+  /** Поставить реакцию на сообщение (заменяет прежнюю реакцию бота). `emoji` — из разрешённых Telegram. */
+  react(chatId: number, messageId: number, emoji: string): Promise<void>;
   /** Ответить на нажатие кнопки (снять «часики»), опционально — всплывающий текст. */
   answerCallback(callbackId: string, text?: string): Promise<void>;
 }

@@ -75,6 +75,7 @@ export class FakeBotApi {
         return FakeBotApi.ok({ message_id: messageId, chat: { id: params.chat_id }, text: params.text });
       }
       case 'editMessageText':
+      case 'setMessageReaction':
       case 'answerCallbackQuery':
         return FakeBotApi.ok(true);
       default:

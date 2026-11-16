@@ -108,7 +108,7 @@ describe('AgentService.ask', () => {
 });
 
 describe('AgentService.decide', () => {
-  test('решение по таймауту: сообщение обновляется, кнопки остаются', async () => {
+  test('решение по таймауту: сообщение обновляется, кнопки вариантов остаются, «Жди меня» — нет', async () => {
     const { agent, telegram, store } = setup();
     const q = await agent.ask(nur, db);
     const before = telegram.last(NUR_CHAT)!;
@@ -119,7 +119,7 @@ describe('AgentService.decide', () => {
 
     const after = telegram.message(NUR_CHAT, before.messageId)!;
     expect(after.text).toBe(`${before.text}\n\n🤖 Принят A по таймауту. Кнопки — чтобы переиграть.`);
-    expect(after.buttons).toEqual(before.buttons);
+    expect(after.buttons).toEqual(before.buttons?.slice(0, -1));
   });
 
   test('свободный текст решения', async () => {
@@ -170,18 +170,17 @@ describe('AgentService.inbox и ack', () => {
     expect(kit.store.session(nurKey)?.lastSeenAt).toBe(kit.clock.now());
   });
 
-  test('ack: отметка «в ящике» меняется на «прочитано агентом», повторный ack — без правок', async () => {
+  test('ack: реакция на сообщении человека ✍ → 👀, повторный ack — без правок', async () => {
     const kit = setup();
     directive(kit, 'i_1', 'стоп');
-    const mark = await kit.telegram.send({ chatId: NUR_CHAT, text: '📥 в ящике сессии u7-school' });
-    kit.store.saveLink({ chatId: NUR_CHAT, messageId: mark, sessionKey: nurKey, inboxId: 'i_1' });
+    kit.store.saveLink({ chatId: NUR_CHAT, messageId: 500, sessionKey: nurKey, inboxId: 'i_1' });
 
     expect(await kit.agent.ack(nur, ['i_1'])).toEqual(['i_1']);
-    expect(kit.telegram.message(NUR_CHAT, mark)?.text).toBe('✅ прочитано агентом · сессия u7-school');
+    expect(kit.telegram.reaction(NUR_CHAT, 500)).toBe('👀');
     expect(await kit.agent.inbox(nur)).toEqual([]);
 
     expect(await kit.agent.ack(nur, ['i_1'])).toEqual([]);
-    expect(kit.telegram.edits).toHaveLength(1);
+    expect(kit.telegram.reactions).toHaveLength(1);
   });
 
   test('ack неизвестного id — DomainError; ничего не отмечено', async () => {

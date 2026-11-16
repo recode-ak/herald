@@ -40,7 +40,7 @@ function setup() {
 }
 
 describe('Ожидание ответа на вопрос', () => {
-  test('ответ кнопкой будит ожидание; ответ отмечен прочитанным и не дублируется во входящих', async () => {
+  test('ответ кнопкой будит ожидание; ответ прочитан, не дублируется во входящих, без отметок', async () => {
     const k = setup();
     const q = await k.agent.ask(nur, db);
     const qMsg = k.telegram.last(NUR_CHAT)!;
@@ -52,7 +52,8 @@ describe('Ожидание ответа на вопрос', () => {
     expect(result.status).toBe('answered');
     expect(result.resolution?.option).toBe('B');
     expect(await k.agent.inbox(nur)).toEqual([]);
-    expect(k.telegram.last(NUR_CHAT)?.text).toBe('✅ прочитано агентом · сессия u7-school');
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(1);
+    expect(k.telegram.reactions).toEqual([]);
   });
 
   test('уже отвеченный — сразу', async () => {

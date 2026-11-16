@@ -85,7 +85,7 @@ export class AgentService {
     return this.deps.store.inbox(session.key).pending();
   }
 
-  /** Подтвердить прочтение. Возвращает id впервые прочитанных; их отметки в Telegram → «прочитано агентом». */
+  /** Подтвердить прочтение. Возвращает id впервые прочитанных; реакция на их сообщениях в Telegram → «прочитано» (👀). */
   async ack(caller: Caller, ids: readonly string[]): Promise<string[]> {
     const session = this.enter(caller);
     const { store } = this.deps;
@@ -94,7 +94,7 @@ export class AgentService {
       for (const item of items) store.saveInboxItem(item);
       return items;
     });
-    for (const item of read) await this.notices.read(item, session);
+    for (const item of read) await this.notices.read(item);
     return read.map((i) => i.id);
   }
 

@@ -98,7 +98,11 @@ describe('Канал по stdio', () => {
     const event = events.find((e) => e.params?.content === 'Займись доками');
     expect(event?.method).toBe('notifications/claude/channel');
     expect(event?.params?.meta).toMatchObject({ kind: 'directive' });
-    await until(() => fake.callsOf('editMessageText').some((p) => p.text === '✅ прочитано агентом · сессия claude'));
+    await until(() =>
+      fake
+        .callsOf('setMessageReaction')
+        .some((p) => p.message_id === 5001 && JSON.stringify(p.reaction) === '[{"type":"emoji","emoji":"👀"}]'),
+    );
   });
 
   test('ask сразу возвращает id; ответ кнопкой приходит событием', async () => {

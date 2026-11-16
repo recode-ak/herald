@@ -217,7 +217,7 @@ describe('Статус и входящие', () => {
     const ack = await k.call('/v1/ack', { session, ids: [items[0]!.id] });
     expect(ack).toEqual({ status: 200, json: { read: [items[0]!.id] } });
     expect((await k.call('/v1/inbox', { session })).json.items).toEqual([]);
-    expect(k.telegram.last(NUR_CHAT)?.text).toBe('✅ прочитано агентом · сессия u7-school');
+    expect(k.telegram.reactions.at(-1)).toMatchObject({ chatId: NUR_CHAT, emoji: '👀' });
   });
 
   test('inbox по таймауту — пусто', async () => {
