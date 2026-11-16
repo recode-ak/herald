@@ -13,7 +13,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Агент и HTTP — `ask` с `questions`, `decide`/`answered` с `answers`, `POST /v1/to-terminal`, провод (40362c5)
 - [x] Task: Conductor - User Manual Verification 'Фаза 1: Домен, хранилище, сервер' (badf558) (Protocol in workflow.md)
 
-## Фаза 2: Клиенты, документы и выкатка
+## Фаза 2: Клиенты, документы и выкатка [checkpoint: 04b170b]
 
 Критерии фазы: требования 18–19 покрыты тестами; документы обновлены; сервер выкачен, ручная проверка пройдена.
 
@@ -22,4 +22,4 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Мост pi — доставка `to-terminal` (6ad9c80)
 - [x] Task: Документы — `docs/model.md`, `docs/install.md` (495d32f)
 - [x] Task: Выкатка и ручная проверка на проде (37ba85b)
-- [ ] Task: Conductor - User Manual Verification 'Фаза 2: Клиенты, документы и выкатка' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 2: Клиенты, документы и выкатка' (04b170b) (Protocol in workflow.md)
