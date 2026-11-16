@@ -82,7 +82,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Подтверждение действий из Telegram (df7b0d1)
     - [x] Тесты: `permission_request` → вопрос «разрешить / запретить» → `notifications/claude/channel/permission`; выключено по умолчанию
     - [x] Реализация
-- [~] Task: `docs/install.md` — подключение канала (`.mcp.json`, флаг запуска, ограничения research preview)
+- [x] Task: `docs/install.md` — подключение канала (`.mcp.json`, флаг запуска, ограничения research preview) (6c33a80)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 5: Channel для Claude Code' (Protocol in workflow.md)
 
 ## Фаза 6: Деплой и установка
