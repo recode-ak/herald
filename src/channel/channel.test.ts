@@ -64,6 +64,7 @@ describe('HeraldChannel — объявление', () => {
       'reply',
       'status',
       'title',
+      'to_terminal',
     ]);
     for (const t of tools) expect(t.description).toBeString();
   });
@@ -157,6 +158,89 @@ describe('HeraldChannel — инструменты', () => {
       { id: 'q_7', choice: { option: 'A' } },
       { id: 'q_8', choice: { text: 'herald' } },
     ]);
+  });
+
+  test('ask с questions — пачка; text и questions вместе или ни одного — isError', async () => {
+    const { herald, call } = await setup();
+    const questions = [{ text: 'База?', options: [{ id: 'A', text: 'SQLite' }], recommended: 'A' }, { text: 'Порт?' }];
+    const r = await call('ask', { questions, timeout_seconds: 60 });
+    expect(r.isError).toBe(false);
+    expect(r.text).toContain('пачка из 2');
+    expect(herald.asked.at(-1)).toEqual({
+      questions: [
+        { text: 'База?', options: [{ id: 'A', text: 'SQLite' }], recommended: 'A' },
+        { text: 'Порт?', options: [] },
+      ],
+      timeoutMs: 60_000,
+    });
+    expect((await call('ask', { text: 'x', questions })).isError).toBe(true);
+    expect((await call('ask', {})).isError).toBe(true);
+    expect((await call('ask', { questions: [{ options: [] }] })).isError).toBe(true);
+  });
+
+  test('decide и answered с answers по пунктам', async () => {
+    const { herald, call } = await setup();
+    await call('decide', { question_id: 'q_7', answers: [{ item: 2, text: '80' }], reason: 'по таймауту' });
+    await call('answered', { question_id: 'q_8', answers: [{ item: 1, option: 'A' }] });
+    expect(herald.decided.at(-1)).toEqual({ id: 'q_7', choice: [{ item: 2, text: '80' }], reason: 'по таймауту' });
+    expect(herald.answeredInTerminal.at(-1)).toEqual({ id: 'q_8', choice: [{ item: 1, option: 'A' }] });
+    expect((await call('decide', { question_id: 'q', answers: [{ item: 0, text: 'x' }], reason: 'r' })).isError).toBe(
+      true,
+    );
+    expect((await call('answered', { question_id: 'q', answers: [{ item: 1 }] })).isError).toBe(true);
+  });
+
+  test('to_terminal — что спросить здесь: неотвеченные пункты с вариантами', async () => {
+    const { herald, call } = await setup();
+    herald.terminalQuestions = [
+      {
+        id: 'q_5',
+        text: 'База?',
+        options: [],
+        status: 'open',
+        askedAt: 0,
+        terminalAt: 1,
+        lateAnswers: [],
+        items: [
+          {
+            text: 'База?',
+            options: [{ id: 'A', text: 'SQLite' }],
+            resolution: { by: 'human', option: 'A', at: 1 },
+            lateAnswers: [],
+          },
+          {
+            text: 'Логи?',
+            options: [
+              { id: 'A', text: 'stderr' },
+              { id: 'B', text: 'файл' },
+            ],
+            recommended: 'B',
+            lateAnswers: [],
+          },
+        ],
+      },
+    ];
+    const r = await call('to_terminal', {});
+    expect(herald.movedToTerminal).toEqual([undefined]);
+    expect(r.text).toBe(
+      [
+        'Переведено в терминал — спроси человека здесь своим UI и закрой ответы инструментом answered:',
+        '',
+        'q_5 (уже ответил: 1. База? — A: SQLite)',
+        '2. Логи? — варианты: A: stderr; B: файл ⭐',
+      ].join('\n'),
+    );
+    await call('to_terminal', { question_id: 'q_9' });
+    expect(herald.movedToTerminal.at(-1)).toBe('q_9');
+    herald.terminalQuestions = [];
+    expect((await call('to_terminal', {})).text).toBe('открытых вопросов нет');
+  });
+
+  test('инструкции: связанные вопросы — одним ask; «тут» — to_terminal', async () => {
+    const { client } = await setup();
+    expect(client.getInstructions()).toContain('одним ask');
+    expect(client.getInstructions()).toContain('to_terminal');
+    expect(client.getInstructions()).toContain('kind="to-terminal"');
   });
 
   test('неверные аргументы и ошибка сервера — isError с текстом', async () => {
@@ -402,7 +486,7 @@ describe('HeraldChannel — без событий (Claude Code запущен б
     expect(r.text).toContain('Займись тестами');
     expect(r.text).toContain('kind=answer item_id=i_2 question_id=q_1 option=B');
     expect(r.text).toContain('Ответ на вопрос q_1: B: Postgres');
-    expect(herald.lastKinds).toEqual(['directive', 'answer', 'late-answer']);
+    expect(herald.lastKinds).toEqual(['directive', 'answer', 'late-answer', 'to-terminal']);
     expect(herald.acked).toEqual(['i_1', 'i_2']);
     expect((await call('inbox', {})).text).toContain('входящих нет');
     expect((await call('inbox', { wait_seconds: 'x' })).isError).toBe(true);

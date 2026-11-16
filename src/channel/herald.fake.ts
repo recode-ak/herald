@@ -1,4 +1,4 @@
-import type { AskItem, AskRequest } from '../client/client.ts';
+import type { AskItem, AskRequest, ItemAnswerRequest } from '../client/client.ts';
 import type { InboxKind } from '../domain/inbox.ts';
 import type { Choice } from '../domain/question.ts';
 import type { InboxItemWire, QuestionWire } from '../http/wire.ts';
@@ -11,8 +11,12 @@ export class FakeHerald implements ChannelHerald {
   readonly titles: string[] = [];
   byes = 0;
   readonly asked: AskRequest[] = [];
-  readonly decided: { id: string; choice: Choice; reason: string }[] = [];
-  readonly answeredInTerminal: { id: string; choice: Choice }[] = [];
+  readonly decided: { id: string; choice: Choice | readonly ItemAnswerRequest[]; reason: string }[] = [];
+  readonly answeredInTerminal: { id: string; choice: Choice | readonly ItemAnswerRequest[] }[] = [];
+  /** Аргументы toTerminal. */
+  readonly movedToTerminal: (string | undefined)[] = [];
+  /** Что вернёт toTerminal. */
+  terminalQuestions: QuestionWire[] = [];
   readonly acked: string[] = [];
   /** Сколько раз спрашивали входящие. */
   polls = 0;
@@ -72,16 +76,22 @@ export class FakeHerald implements ChannelHerald {
     };
   }
 
-  async answered(id: string, choice: Choice): Promise<QuestionWire> {
+  async answered(id: string, choice: Choice | readonly ItemAnswerRequest[]): Promise<QuestionWire> {
     this.maybeFail();
     this.answeredInTerminal.push({ id, choice });
     return { id, text: '', options: [], status: 'answered', askedAt: 0, lateAnswers: [], items: [] };
   }
 
-  async decide(id: string, choice: Choice, reason: string): Promise<QuestionWire> {
+  async decide(id: string, choice: Choice | readonly ItemAnswerRequest[], reason: string): Promise<QuestionWire> {
     this.maybeFail();
     this.decided.push({ id, choice, reason });
     return { id, text: '', options: [], status: 'decided', askedAt: 0, lateAnswers: [], items: [] };
+  }
+
+  async toTerminal(id?: string): Promise<QuestionWire[]> {
+    this.maybeFail();
+    this.movedToTerminal.push(id);
+    return this.terminalQuestions;
   }
 
   /** Непрочитанные (`kinds` — только этих видов); если их нет — ждёт `push` не дольше 20 мс (короткий long poll). */

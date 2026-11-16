@@ -82,6 +82,7 @@ describe('Канал по stdio', () => {
       'reply',
       'status',
       'title',
+      'to_terminal',
     ]);
   });
 

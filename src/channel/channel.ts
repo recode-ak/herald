@@ -1,7 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { AskRequest } from '../client/client.ts';
+import type { AskItem, AskRequest, ItemAnswerRequest } from '../client/client.ts';
 import type { InboxKind } from '../domain/inbox.ts';
 import type { Choice, QuestionOption } from '../domain/question.ts';
 import type { InboxItemWire, QuestionWire } from '../http/wire.ts';
@@ -13,8 +13,9 @@ export interface ChannelHerald {
   title(text: string): Promise<void>;
   bye(): Promise<void>;
   ask(request: AskRequest): Promise<QuestionWire>;
-  decide(id: string, choice: Choice, reason: string): Promise<QuestionWire>;
-  answered(id: string, choice: Choice): Promise<QuestionWire>;
+  decide(id: string, answers: Choice | readonly ItemAnswerRequest[], reason: string): Promise<QuestionWire>;
+  answered(id: string, answers: Choice | readonly ItemAnswerRequest[]): Promise<QuestionWire>;
+  toTerminal(id?: string): Promise<QuestionWire[]>;
   inbox(waitMs?: number, kinds?: readonly InboxKind[]): Promise<InboxItemWire[]>;
   ack(ids: readonly string[]): Promise<string[]>;
 }
@@ -70,6 +71,13 @@ const COMMON = [
   '',
 ];
 
+const BATCH_AND_TERMINAL = [
+  'Несколько связанных вопросов задавай одним ask с questions (до 10): человек получает их по одному, ответы приходят одним событием; срок timeout_seconds — на всю пачку. decide и answered по пачке — с answers: [{ item, option | text }] (decide без ответа на пункт берёт рекомендованный).',
+  '',
+  'Человек в терминале просит спросить здесь («тут», «в терминал», «спроси здесь») — вызови to_terminal (без question_id — все открытые вопросы сессии), задай вернувшиеся пункты своим UI (в Claude Code — AskUserQuestion) и закрой ответы инструментом answered. Решать сам переведённый вопрос нельзя.',
+  '',
+];
+
 const STATUS_AND_TITLE = [
   'status — короткий статус сессии на границах задач (в Telegram не отправляется, человек видит его по /status).',
   '',
@@ -83,8 +91,11 @@ const EVENTS_INSTRUCTIONS = [
   '- kind="directive" — указание человека этой сессии; выполни его как просьбу пользователя.',
   '- kind="answer" question_id="..." — ответ на твой вопрос (option — id выбранного варианта).',
   '- kind="late-answer" question_id="..." — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
+  '- kind="to-terminal" question_id="..." — человек перевёл вопрос в терминал: задай неотвеченные пункты здесь своим UI (в Claude Code — AskUserQuestion) и закрой ответы инструментом answered.',
   '',
   'ask задаёт вопрос с вариантами и сразу возвращает id — не жди, продолжай работу; ответ придёт событием. С timeout_seconds: если к сроку ответа нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). Без timeout_seconds решать нельзя — жди ответа. Человек ответил в терминале — закрой вопрос инструментом answered.',
+  '',
+  ...BATCH_AND_TERMINAL,
   ...STATUS_AND_TITLE,
 ].join('\n');
 
@@ -95,13 +106,39 @@ const PULL_INSTRUCTIONS = [
   '- kind=directive — указание человека этой сессии; выполни его как просьбу пользователя.',
   '- kind=answer question_id=... — ответ на твой вопрос (option — id выбранного варианта).',
   '- kind=late-answer question_id=... — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
+  '- kind=to-terminal question_id=... — человек перевёл вопрос в терминал: задай неотвеченные пункты здесь своим UI и закрой ответы инструментом answered.',
   '',
   'ask задаёт вопрос с вариантами и сразу возвращает id; ответ забери инструментом inbox. С timeout_seconds: если к сроку ответа нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). Без timeout_seconds решать нельзя — жди ответа. Человек ответил в терминале — закрой вопрос инструментом answered.',
+  '',
+  ...BATCH_AND_TERMINAL,
   ...STATUS_AND_TITLE,
 ].join('\n');
 
 /** Что агент забирает инструментом `inbox`; команды терминала берёт цикл. */
-const PULL_KINDS: readonly InboxKind[] = ['directive', 'answer', 'late-answer'];
+const PULL_KINDS: readonly InboxKind[] = ['directive', 'answer', 'late-answer', 'to-terminal'];
+
+const OPTIONS_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: { id: { type: 'string', description: 'короткий: A, B…' }, text: { type: 'string' } },
+    required: ['id', 'text'],
+  },
+};
+
+const ANSWERS_SCHEMA = {
+  type: 'array',
+  description: 'ответы по пунктам пачки вместо option/text',
+  items: {
+    type: 'object',
+    properties: {
+      item: { type: 'number', description: 'номер пункта, с 1' },
+      option: { type: 'string', description: 'id варианта' },
+      text: { type: 'string', description: 'свободный ответ вместо варианта' },
+    },
+    required: ['item'],
+  },
+};
 
 const TOOLS = [
   {
@@ -123,22 +160,28 @@ const TOOLS = [
       type: 'object',
       properties: {
         text: { type: 'string' },
-        options: {
+        options: OPTIONS_SCHEMA,
+        recommended: { type: 'string', description: 'id рекомендованного варианта' },
+        questions: {
           type: 'array',
+          description:
+            'пачка связанных вопросов (до 10) вместо text/options/recommended: человек получает их по одному, ответы придут одним событием',
           items: {
             type: 'object',
-            properties: { id: { type: 'string', description: 'короткий: A, B…' }, text: { type: 'string' } },
-            required: ['id', 'text'],
+            properties: {
+              text: { type: 'string' },
+              options: OPTIONS_SCHEMA,
+              recommended: { type: 'string', description: 'id рекомендованного варианта' },
+            },
+            required: ['text'],
           },
         },
-        recommended: { type: 'string', description: 'id рекомендованного варианта' },
         timeout_seconds: {
           type: 'number',
           description:
-            'сколько ждёшь ответа, прежде чем решить сам (decide); человек видит срок и кнопку «Жди меня». Без него decide запрещён — ждёшь ответа',
+            'сколько ждёшь ответа (на всю пачку), прежде чем решить сам (decide); человек видит срок и кнопку «Жди меня». Без него decide запрещён — ждёшь ответа',
         },
       },
-      required: ['text'],
     },
   },
   {
@@ -151,6 +194,10 @@ const TOOLS = [
         question_id: { type: 'string' },
         option: { type: 'string', description: 'id варианта' },
         text: { type: 'string', description: 'свободный ответ вместо варианта' },
+        answers: {
+          ...ANSWERS_SCHEMA,
+          description: 'ответы по пунктам пачки вместо option/text; пункт без ответа — рекомендованный ([] — все)',
+        },
         reason: { type: 'string', description: 'почему, например «по таймауту»' },
       },
       required: ['question_id', 'reason'],
@@ -166,9 +213,16 @@ const TOOLS = [
         question_id: { type: 'string' },
         option: { type: 'string', description: 'id выбранного варианта' },
         text: { type: 'string', description: 'свободный ответ вместо варианта' },
+        answers: ANSWERS_SCHEMA,
       },
       required: ['question_id'],
     },
+  },
+  {
+    name: 'to_terminal',
+    description:
+      'Человек ответит в терминале: вопрос (или, без question_id, все открытые вопросы сессии) уходит из Telegram. Возвращает пункты — задай их своим UI и закрой ответы инструментом answered.',
+    inputSchema: { type: 'object', properties: { question_id: { type: 'string' } } },
   },
   {
     name: 'status',
@@ -416,37 +470,44 @@ export class HeraldChannel {
           await this.herald.title(HeraldChannel.string(args, 'text'));
           return HeraldChannel.ok('название сессии обновлено');
         case 'ask': {
-          const recommended = HeraldChannel.optionalString(args, 'recommended');
           const timeout = args.timeout_seconds;
           if (timeout !== undefined && (typeof timeout !== 'number' || !Number.isSafeInteger(timeout) || timeout < 0))
             throw new ToolArgsError('аргумент «timeout_seconds» — ожидается целое число ≥ 0');
-          const question = await this.herald.ask({
-            text: HeraldChannel.string(args, 'text'),
-            options: HeraldChannel.options(args),
-            ...(recommended !== undefined && { recommended }),
-            ...(timeout !== undefined && { timeoutMs: timeout * 1_000 }),
-          });
+          const timeoutMs = timeout !== undefined ? { timeoutMs: timeout * 1_000 } : {};
+          let request: AskRequest;
+          if (args.questions !== undefined) {
+            if (args.text !== undefined) throw new ToolArgsError('нужен text или questions, не оба');
+            request = { questions: HeraldChannel.questions(args.questions), ...timeoutMs };
+          } else {
+            request = { ...HeraldChannel.askItem(args), ...timeoutMs };
+          }
+          const question = await this.herald.ask(request);
+          const what = question.items.length > 1 ? `пачка из ${question.items.length} вопросов` : 'вопрос';
           return HeraldChannel.ok(
             this.events
-              ? `вопрос ${question.id} задан; ответ придёт событием <channel kind="answer" question_id="${question.id}">`
-              : `вопрос ${question.id} задан; ответ забери инструментом inbox (kind=answer question_id=${question.id})`,
+              ? `${what} ${question.id} задан(а); ответ придёт событием <channel kind="answer" question_id="${question.id}">`
+              : `${what} ${question.id} задан(а); ответ забери инструментом inbox (kind=answer question_id=${question.id})`,
           );
         }
         case 'answered': {
           const question = await this.herald.answered(
             HeraldChannel.string(args, 'question_id'),
-            HeraldChannel.choice(args),
+            HeraldChannel.answers(args),
           );
           return HeraldChannel.ok(`вопрос ${question.id} закрыт ответом из терминала`);
         }
         case 'decide': {
-          const choice = HeraldChannel.choice(args);
+          const answers = HeraldChannel.answers(args);
           const question = await this.herald.decide(
             HeraldChannel.string(args, 'question_id'),
-            choice,
+            answers,
             HeraldChannel.string(args, 'reason'),
           );
           return HeraldChannel.ok(`решение по вопросу ${question.id} принято`);
+        }
+        case 'to_terminal': {
+          const moved = await this.herald.toTerminal(HeraldChannel.optionalString(args, 'question_id'));
+          return HeraldChannel.ok(HeraldChannel.terminalText(moved));
         }
         case 'inbox':
           if (this.events)
@@ -468,6 +529,75 @@ export class HeraldChannel {
     const value = args[name];
     if (typeof value !== 'string') throw new ToolArgsError(`аргумент «${name}» — ожидается строка`);
     return value;
+  }
+
+  /** Одиночный вопрос: `text`, `options`, `recommended`. */
+  private static askItem(args: Record<string, unknown>): AskItem {
+    const recommended = HeraldChannel.optionalString(args, 'recommended');
+    return {
+      text: HeraldChannel.string(args, 'text'),
+      options: HeraldChannel.options(args),
+      ...(recommended !== undefined && { recommended }),
+    };
+  }
+
+  private static questions(value: unknown): AskItem[] {
+    if (!Array.isArray(value) || value.length === 0)
+      throw new ToolArgsError('аргумент «questions» — ожидается непустой массив { text, options?, recommended? }');
+    return value.map((q, i) => {
+      if (typeof q !== 'object' || q === null) throw new ToolArgsError(`questions[${i}] — ожидается объект`);
+      try {
+        return HeraldChannel.askItem(q as Record<string, unknown>);
+      } catch (error) {
+        throw new ToolArgsError(`questions[${i}]: ${HeraldChannel.message(error)}`);
+      }
+    });
+  }
+
+  /** `answers` (по пунктам) или `option` / `text`. */
+  private static answers(args: Record<string, unknown>): Choice | ItemAnswerRequest[] {
+    const value = args.answers;
+    if (value === undefined) return HeraldChannel.choice(args);
+    if (args.option !== undefined || args.text !== undefined)
+      throw new ToolArgsError('нужен answers или option/text, не оба');
+    if (!Array.isArray(value)) throw new ToolArgsError('аргумент «answers» — ожидается массив { item, option | text }');
+    return value.map((a, i) => {
+      const raw = (typeof a === 'object' && a !== null ? a : {}) as Record<string, unknown>;
+      const item = raw.item;
+      if (typeof item !== 'number' || !Number.isSafeInteger(item) || item < 1)
+        throw new ToolArgsError(`answers[${i}]: «item» — номер пункта ≥ 1`);
+      try {
+        const choice = HeraldChannel.choice(raw);
+        return 'option' in choice ? { item, option: choice.option } : { item, text: choice.text };
+      } catch (error) {
+        throw new ToolArgsError(`answers[${i}]: ${HeraldChannel.message(error)}`);
+      }
+    });
+  }
+
+  /** Результат `to_terminal`: по вопросу — что уже отвечено и что спросить. */
+  private static terminalText(questions: readonly QuestionWire[]): string {
+    if (questions.length === 0) return 'открытых вопросов нет';
+    const blocks = questions.map((q) => {
+      const line = (n: number, it: QuestionWire['items'][number]) => {
+        const r = it.resolution;
+        if (r) {
+          const answer =
+            r.option !== undefined ? `${r.option}: ${it.options.find((o) => o.id === r.option)?.text ?? ''}` : r.text;
+          return `${n}. ${it.text} — ${answer}`;
+        }
+        const options = it.options.map((o) => `${o.id}: ${o.text}${it.recommended === o.id ? ' ⭐' : ''}`).join('; ');
+        return `${n}. ${it.text} — ${options ? `варианты: ${options}` : 'свободный ответ'}`;
+      };
+      const done = q.items.flatMap((it, i) => (it.resolution ? [line(i + 1, it)] : []));
+      const ask = q.items.flatMap((it, i) => (it.resolution ? [] : [line(i + 1, it)]));
+      return [`${q.id}${done.length > 0 ? ` (уже ответил: ${done.join('; ')})` : ''}`, ...ask].join('\n');
+    });
+    return [
+      'Переведено в терминал — спроси человека здесь своим UI и закрой ответы инструментом answered:',
+      '',
+      blocks.join('\n\n'),
+    ].join('\n');
   }
 
   /** `option` или `text` — ровно одно из них. */
