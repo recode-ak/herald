@@ -1,0 +1,1 @@
+Задачи 1–2 трека question-group: домен пачки (src/domain/question.ts, inbox.ts), хранилище v6 (src/infra/sqlite-store.ts, src/app/store.ts: openQuestions, MessageLink.item), провод (src/http/wire.ts). Причина — spec п. 1–7. Объединены: без хранилища и провода check не зелёный.
