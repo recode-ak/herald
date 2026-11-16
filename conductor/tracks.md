@@ -11,3 +11,8 @@
 
 - [x] **Track: Очистка БД herald по сроку хранения; запуск и отчёт через server-ops**
 *Link: [./tracks/retention_20261117/](./tracks/retention_20261117/)*
+
+---
+
+- [~] **Track: Пачка вопросов по очереди: «Жди меня» на пачку и «В терминал»**
+*Link: [./tracks/question-group_20261117/](./tracks/question-group_20261117/)*
