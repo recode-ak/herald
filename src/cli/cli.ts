@@ -177,6 +177,7 @@ export class Cli {
     const session = new SessionLocator(config.host).locate({
       cwd: this.deps.cwd,
       name: args.value('session') ?? this.deps.env.HERALD_SESSION,
+      agentProcess: Cli.pid(this.deps.env.CLAUDE_PID),
       agentSession: this.deps.env.CLAUDE_CODE_SESSION_ID ?? this.deps.env.PI_SESSION_ID,
     });
     return new HeraldClient({ serverUrl: config.serverUrl, token: config.token, session, clock: this.deps.clock });
@@ -185,6 +186,12 @@ export class Cli {
   private print(value: unknown): number {
     this.deps.out(`${JSON.stringify(value)}\n`);
     return 0;
+  }
+
+  /** pid из переменной окружения; не число — `undefined`. */
+  private static pid(raw: string | undefined): number | undefined {
+    const pid = Number(raw);
+    return raw !== undefined && Number.isSafeInteger(pid) && pid > 0 ? pid : undefined;
   }
 
   /** Текст команды — позиционные аргументы через пробел. */

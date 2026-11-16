@@ -48,4 +48,41 @@ describe('SessionLocator', () => {
     });
     expect(locator.locate({ cwd: dir, agentSession: ' ' })).toEqual({ host: 'laptop', root: dir });
   });
+
+  test('окно агента (pid Claude Code) главнее id разговора: /clear меняет разговор, а не окно', () => {
+    const dir = tempDir();
+    const starts = new Map([[4242, 'Mon Nov 16 23:07:10 2026']]);
+    const locator = new SessionLocator('laptop', { startOf: (pid) => starts.get(pid) });
+    const before = locator.locate({ cwd: dir, agentProcess: 4242, agentSession: 'a8ae28ed-c329' });
+    const after = locator.locate({ cwd: dir, agentProcess: 4242, agentSession: '1fea0f01-2878' });
+    expect(before).toEqual(after);
+    expect(before.instance).toMatch(/^[0-9a-f]{4}$/);
+    expect(before.instance).toBe(SessionLocator.windowTag(4242, 'Mon Nov 16 23:07:10 2026'));
+  });
+
+  test('окно: тот же pid после перезапуска (другое время старта) — другая метка; время не узнали — по pid', () => {
+    const dir = tempDir();
+    let start: string | undefined = 'Mon Nov 16 23:07:10 2026';
+    const locator = new SessionLocator('laptop', { startOf: () => start });
+    const first = locator.locate({ cwd: dir, agentProcess: 4242 }).instance;
+    start = 'Tue Nov 17 09:00:00 2026';
+    expect(locator.locate({ cwd: dir, agentProcess: 4242 }).instance).not.toBe(first);
+    start = undefined;
+    expect(locator.locate({ cwd: dir, agentProcess: 4242 }).instance).toBe(SessionLocator.windowTag(4242));
+  });
+
+  test('системный процесс: время старта текущего процесса известно, несуществующего — нет', () => {
+    expect(SessionLocator.system.startOf(process.pid)).toBeString();
+    expect(SessionLocator.system.startOf(2 ** 22 + 1)).toBeUndefined();
+  });
+
+  test('явное имя главнее окна', () => {
+    const dir = tempDir();
+    const locator = new SessionLocator('laptop', { startOf: () => 'x' });
+    expect(locator.locate({ cwd: dir, name: 'ночь', agentProcess: 4242 })).toEqual({
+      host: 'laptop',
+      root: dir,
+      name: 'ночь',
+    });
+  });
 });

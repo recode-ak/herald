@@ -92,7 +92,7 @@ claude() {
 | Переменная | Смысл |
 |---|---|
 | `HERALD_SESSION` | явное имя сессии вместо корня git (`[host · имя]`) |
-| `CLAUDE_CODE_SESSION_ID` | ставит Claude Code: окно сессии (`[host · проект·02dc]`), см. `docs/model.md` «CLI» |
+| `CLAUDE_CODE_SESSION_ID` | ставит Claude Code; окно сессии канала — по pid Claude Code (`[host · проект·k3f9]`), см. `docs/model.md` «CLI» |
 | `TMUX_PANE` | ставит tmux: панель окна, куда канал набирает `/clear` и `/compact` из Telegram. Claude Code не в tmux — эти команды не выполняются |
 | `HERALD_CHANNEL_EVENTS=1\|0` | режим явно: `1` — события, `0` — без событий (по умолчанию — по флагам Claude Code) |
 | `HERALD_PERMISSION_RELAY=1` | подтверждение действий Claude Code из Telegram: запрос разрешения приходит вопросом «Разрешить / Запретить». По умолчанию выключено |

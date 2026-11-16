@@ -23,6 +23,8 @@ try {
 const session = new SessionLocator(config.host).locate({
   cwd: process.cwd(),
   name: process.env.HERALD_SESSION,
+  // Родитель — окно Claude Code: CLI в его Bash найдёт ту же сессию по CLAUDE_PID, и /clear её не меняет.
+  agentProcess: process.ppid,
   agentSession: process.env.CLAUDE_CODE_SESSION_ID,
 });
 const herald = new HeraldClient({

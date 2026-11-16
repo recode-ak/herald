@@ -7,6 +7,7 @@ import { HumanService } from '../app/human.ts';
 import { FakeTelegram } from '../app/telegram.fake.ts';
 import { NUR_CHAT, SeqIds } from '../app/testkit.fake.ts';
 import { Waiter } from '../app/waiter.ts';
+import { SessionLocator } from '../client/locator.ts';
 import { Access } from '../domain/access.ts';
 import { HttpApi } from '../http/api.ts';
 import { SqliteStore } from '../infra/sqlite-store.ts';
@@ -114,6 +115,19 @@ describe('herald notify / status', () => {
     await k.run(['notify', 'x'], env);
     const project = k.cwd.split('/').at(-1);
     expect(k.telegram.last(NUR_CHAT)?.text).toBe(`[laptop · ${project}·02dc · ревью Ф4]\nx`);
+  });
+
+  test('CLAUDE_PID — окно Claude Code: та же сессия, что у канала, и после /clear (новый CLAUDE_CODE_SESSION_ID)', async () => {
+    const k = setup();
+    const pid = String(process.pid);
+    await k.run(['notify', 'x'], { CLAUDE_PID: pid, CLAUDE_CODE_SESSION_ID: 'a8ae28ed' });
+    await k.run(['notify', 'y'], { CLAUDE_PID: pid, CLAUDE_CODE_SESSION_ID: '1fea0f01' });
+    const project = k.cwd.split('/').at(-1);
+    const tag = SessionLocator.windowTag(process.pid, SessionLocator.system.startOf(process.pid));
+    expect(k.telegram.sentTo(NUR_CHAT).map((m) => m.text)).toEqual([
+      `[laptop · ${project}·${tag}]\nx`,
+      `[laptop · ${project}·${tag}]\ny`,
+    ]);
   });
 
   test('PI_SESSION_ID (bash pi) — окно сессии, как у Claude Code', async () => {
