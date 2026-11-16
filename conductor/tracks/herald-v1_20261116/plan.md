@@ -89,7 +89,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: сервер работает на kalki-server за `https://herald.u7-hub.kz`; реальный бот проходит КП 1–7 (КП 6 — в живой сессии Claude Code); установка клиента — не больше 5 команд (КП 8). Выкатка и действия на сервере — с уведомлением и ожиданием подтверждения.
 
-- [ ] Task: Действия Нурболата (уведомление): бот в BotFather, DNS `herald.u7-hub.kz`, репо на GitHub (публичность — вопрос в уведомлении)
+- [~] Task: Действия Нурболата (уведомление): бот в BotFather, DNS `herald.u7-hub.kz`, репо на GitHub (публичность — вопрос в уведомлении)
 - [ ] Task: Скрипты и документы деплоя — `scripts/deploy.sh`, `backup.contract`, `scripts/backup.sh`, `docs/deploy.md`, `docs/install.md` (сервер и клиент)
 - [ ] Task: Выкатка на kalki-server — `/srv/herald`, `.env` (600), pm2; nginx и certbot — Нурболат (sudo); мониторинг health-check server-ops — по согласованию
 - [ ] Task: Смоук на реальном боте — КП 1–7, результат — в git note
