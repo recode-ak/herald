@@ -1,0 +1,1 @@
+Задача «Сессия». src/domain/session.ts: Session.open/keyOf/restore, touch, setStatus (≤500, без пустых), isActive(окно); src/domain/errors.ts — DomainError. Ключ host:корень или host:@имя; проект — имя корня или имя сессии. check зелёный, 17 тестов.
