@@ -1,0 +1,1 @@
+Задача: срок хранения в домене. Добавлены src/domain/retention.ts, retention.test.ts: Retention.ofDays (целое ≥ 1), DEFAULT = 14 дней, cutoff(now). Зачем: граница очистки БД (трек retention_20261117).
