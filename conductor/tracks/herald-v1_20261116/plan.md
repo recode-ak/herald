@@ -51,10 +51,10 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: HTTP API (`Bun.serve`) (b85c315)
     - [x] Тесты (сервер на случайном порту): токен → человек, неверный токен — 401 (КП 7); эндпоинты notify, ask, вопрос с `wait`, decide, status, inbox с `wait`, подтверждение прочтения
     - [x] Реализация `src/http`
-- [~] Task: Адаптер Telegram Bot API (`fetch`)
-    - [ ] Тесты против локального фейка Bot API: `getUpdates` long polling с сохранением offset, `sendMessage` с inline-кнопками, `editMessageText`, `answerCallbackQuery`, ошибки и повторы
-    - [ ] Реализация `src/infra/telegram`
-- [ ] Task: Точка входа сервера — конфиг из `.env`, сборка, корректная остановка; `docs/model.md` — HTTP API
+- [x] Task: Адаптер Telegram Bot API (`fetch`) (b4fd511)
+    - [x] Тесты против локального фейка Bot API: `getUpdates` long polling с сохранением offset, `sendMessage` с inline-кнопками, `editMessageText`, `answerCallbackQuery`, ошибки и повторы
+    - [x] Реализация `src/infra/telegram`
+- [~] Task: Точка входа сервера — конфиг из `.env`, сборка, корректная остановка; `docs/model.md` — HTTP API
 - [ ] Task: Conductor - User Manual Verification 'Фаза 3: HTTP-сервер и Telegram-адаптер' (Protocol in workflow.md)
 
 ## Фаза 4: CLI
