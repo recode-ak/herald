@@ -117,7 +117,10 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] `claude mcp add --scope user herald -- bun ~/dev/tools/herald/src/channel/main.ts` — ✔ Connected
     - [ ] `permissions.allow` для `mcp__herald__*` — агенту запрещено править `~/.claude/settings.json`, за Нурболатом (по желанию)
     - [ ] КП 6 — живая сессия `claude --dangerously-load-development-channels server:herald`, за Нурболатом
-- [ ] Task: Инструкция «Автопилот» в `~/.pi/agent/AGENTS.md` → herald (`ask`, `status` и `inbox` на границах задач, канал в Claude Code); память агента; удалить `~/.local/bin/agent-notify` и `agent-notify.env`
+- [x] Task: Инструкция «Автопилот» в `~/.pi/agent/AGENTS.md` → herald (`ask`, `status` и `inbox` на границах задач, канал в Claude Code); память агента; удалить `~/.local/bin/agent-notify` и `agent-notify.env`
+    - [x] `~/.pi/agent/AGENTS.md`, «Автопилот»: п. 4 — вопросы `ask` (канал или CLI `--timeout 180`), `decide` по таймауту, «Жди меня», поздние ответы; п. 6 — `status` и `inbox --ack` на границах задач; п. 7 — `herald notify`; запасной путь — терминал
+    - [x] Память агента (u7-school, `feedback-finish-then-stop`) → herald
+    - [ ] Удалить `~/.local/bin/agent-notify` и `agent-notify.env` — агенту запрещено, за Нурболатом: `rm ~/.local/bin/agent-notify ~/.local/bin/agent-notify.env`
 - [ ] Task: Финальный гейт — `bun run check`, сравнение с базовой линией; `summary.md` трека: сделанное, решения (вопрос → варианты → выбранное → как переиграть), отложенное
 - [ ] Task: Conductor - User Manual Verification 'Фаза 7: Перевод Автопилота и итог' (Protocol in workflow.md)
 
