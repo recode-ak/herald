@@ -45,11 +45,11 @@ const channel = new HeraldChannel({
   events,
   silent: launch?.print ?? false,
 });
-// Claude Code закрыл канал или процесс останавливают — herald узнаёт, что окно закрыто (сессия ⚪).
+// Claude Code закрыл канал, процесс останавливают или закрыли панель tmux (SIGHUP) — herald узнаёт,
+// что окно закрыто (сессия ⚪), а не держит его «на связи» до конца пульса.
 const exit = () => void channel.close().finally(() => process.exit(0));
 channel.onclose = exit;
-process.on('SIGTERM', exit);
-process.on('SIGINT', exit);
+for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) process.on(signal, exit);
 await channel.connect(new StdioServerTransport());
 channel.start();
 log(

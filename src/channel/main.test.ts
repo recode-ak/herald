@@ -24,4 +24,48 @@ describe('src/channel/main.ts', () => {
     expect(await new Response(proc.stderr).text()).toContain('serverUrl');
     expect(await new Response(proc.stdout).text()).toBe('');
   });
+
+  test.each(['SIGHUP', 'SIGTERM'] as const)(
+    '%s (закрыли панель tmux, остановили процесс) — bye и код 0',
+    async (signal) => {
+      const home = mkdtempSync(join(tmpdir(), 'herald-ch-main-'));
+      dirs.push(home);
+      const paths: string[] = [];
+      let seen: () => void = () => undefined;
+      const contacted = new Promise<void>((resolve) => {
+        seen = resolve;
+      });
+      const server = Bun.serve({
+        port: 0,
+        hostname: '127.0.0.1',
+        fetch: async (req) => {
+          paths.push(new URL(req.url).pathname);
+          seen();
+          return Response.json({ items: [] });
+        },
+      });
+      try {
+        const proc = Bun.spawn(['bun', MAIN], {
+          cwd: home,
+          env: {
+            PATH: process.env.PATH ?? '',
+            HOME: home,
+            HERALD_URL: `http://127.0.0.1:${server.port}`,
+            HERALD_TOKEN: 't',
+            HERALD_HOST: 'laptop',
+            HERALD_CHANNEL_EVENTS: '1',
+          },
+          stdin: 'pipe',
+          stdout: 'pipe',
+          stderr: 'pipe',
+        });
+        await contacted;
+        proc.kill(signal);
+        expect(await proc.exited).toBe(0);
+        expect(paths).toContain('/v1/bye');
+      } finally {
+        server.stop(true);
+      }
+    },
+  );
 });
