@@ -1,10 +1,29 @@
 # Установка herald
 
-Сервер — один на всех (наш — `docs/deploy.md`); клиент — на каждой машине с агентами. Команды CLI и инструменты канала — `docs/model.md`.
+Сервер — один на всех (наш — [deploy.md](deploy.md)); клиент — на каждой машине с агентами. Команды CLI и инструменты канала — `docs/model.md`.
 
 ## Сервер
 
-Появится в Фазе 6 трека v1 (`/srv/herald`, pm2, nginx). Переменные окружения — `docs/model.md`, раздел «Сервер».
+Нужны Bun ≥ 1.4, бот из BotFather и chat_id получателей (напиши боту `/start`, затем `curl -s https://api.telegram.org/bot<токен>/getUpdates` — поле `message.chat.id`; пока сервер не запущен).
+
+```sh
+git clone <репо herald> herald && cd herald
+bun install --production --frozen-lockfile
+install -m 600 /dev/null .env && $EDITOR .env
+bun src/server/main.ts                          # «herald слушает http://127.0.0.1:4518/»
+```
+
+`.env` — минимум три строки (все переменные — `docs/model.md`, «Сервер»):
+
+```sh
+HERALD_BOT_TOKEN=123456:ABC…
+HERALD_TOKENS=nur:<длинный случайный токен>,nur:<токен второй машины>
+HERALD_PEOPLE=nur:<chat_id>
+```
+
+Токен агента — любая длинная случайная строка (`openssl rand -hex 24`). Постоянная работа — менеджер процессов (`pm2 start "bun src/server/main.ts" --name herald --cwd <herald>`), публикация наружу — reverse proxy с `proxy_read_timeout` больше `HERALD_MAX_WAIT_SECONDS` (по умолчанию 50 с). Проверка — `curl -s http://127.0.0.1:4518/health`. Пример целиком (pm2, nginx, бэкап, обновление) — [deploy.md](deploy.md).
+
+Сервер с ботом должен быть один: Telegram отдаёт апдейты одному опрашивающему.
 
 ## Клиент: CLI `herald`
 
