@@ -1,0 +1,1 @@
+Задача «Клиент и CLI» трека question-group: src/client/client.ts, src/cli/cli.ts (+тесты), сужение AskRequest в src/channel/herald.fake.ts и channel.test.ts. Причина — spec п. 19.
