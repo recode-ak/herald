@@ -1,0 +1,3 @@
+Задача: Команды notify, ask, decide, status, inbox (Фаза 4).
+Сделано: Args (src/cli/args.ts) — разбор --x v, --x=v, повторяемый -o, переключатели, --; секунды → мс. Cli (cli.ts): notify/status <текст>, ask <вопрос> -o 'A: текст'… --recommended --timeout <с> (без таймаута — бесконечно), decide <id> (<вариант>|--text) --reason, inbox [--wait <с>] [--ack], ack <id…>; общий --session (или HERALD_SESSION). Вывод — JSON в stdout; ask: {id, status: answered|decided|timeout, by, option, text, reason}. Коды: 0 — готово, 2 — ask по таймауту, 1 — ошибка (usage, настройки, сервер — текст в stderr). main.ts — запуск; bun run link проверен тестом с временным HOME.
+Решения (тактические): HERALD_SESSION как альтернатива --session; inbox --ack для границ задач агентов без канала.
