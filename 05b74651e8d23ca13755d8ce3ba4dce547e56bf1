@@ -1,0 +1,4 @@
+Задача: SQLite-хранилище (Фаза 2).
+- src/app/store.ts — порт Store: сессии, вопросы, входящие (ящик = непрочитанные + include), связи message_id → сессия/вопрос/входящее, offset Telegram, транзакции.
+- src/infra/sqlite-store.ts — SqliteStore: схема через PRAGMA user_version, WAL, busy_timeout; состояние домена через toState/restore, JSON-колонки для вариантов и решений.
+- src/infra/sqlite-store.test.ts — 9 тестов (:memory: и файл), покрытие 100%.
