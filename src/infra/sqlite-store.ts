@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import type { MessageLink, Store } from '../app/store.ts';
+import type { MessageLink, PurgeCounts, PurgeReport, Store } from '../app/store.ts';
 import type { PersonId } from '../domain/access.ts';
 import { Inbox, InboxItem, type InboxKind } from '../domain/inbox.ts';
 import { Question, type QuestionStatus } from '../domain/question.ts';
@@ -92,6 +92,9 @@ const MIGRATIONS = [
   CREATE INDEX message_links_inbox ON message_links (inbox_id);
   `,
 ];
+
+/** Сигнал отката транзакции пробной очистки (`dryRun`). */
+const DRY_RUN = Symbol('dry-run');
 
 interface SessionRow {
   key: string;
@@ -333,6 +336,22 @@ export class SqliteStore implements Store {
     else this.db.query('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)').run(`target:${chatId}`, sessionKey);
   }
 
+  purge(cutoff: number, { dryRun = false }: { dryRun?: boolean } = {}): PurgeReport {
+    let report: PurgeReport | undefined;
+    const run = this.db.transaction(() => {
+      const deleted = this.deleteExpired(cutoff);
+      report = { deleted, remaining: this.counts(), dbBytes: this.dbBytes() };
+      if (dryRun) throw DRY_RUN;
+    });
+    try {
+      run.immediate();
+    } catch (error) {
+      if (error !== DRY_RUN) throw error;
+    }
+    if (!report) throw new Error('purge: нет итога');
+    return report;
+  }
+
   telegramOffset(): number {
     const row = this.db.query<{ value: string }, []>("SELECT value FROM kv WHERE key = 'telegram_offset'").get();
     return row ? Number(row.value) : 0;
@@ -340,6 +359,47 @@ export class SqliteStore implements Store {
 
   setTelegramOffset(offset: number): void {
     this.db.query("INSERT OR REPLACE INTO kv (key, value) VALUES ('telegram_offset', ?)").run(String(offset));
+  }
+
+  /**
+   * Правила очистки (`docs/model.md`, «Хранение»). Живая сессия — обращалась не раньше границы; всё прочих
+   * сессий (и сирот без сессии) удаляется. Сессии — последними: по ним отбираются остальные.
+   */
+  private deleteExpired(cutoff: number): PurgeCounts {
+    const alive = 'SELECT key FROM sessions WHERE last_seen_at >= $cutoff';
+    const run = (sql: string) => this.db.query<never, { cutoff: number }>(sql).run({ cutoff }).changes;
+    const targets = run(`DELETE FROM kv WHERE key LIKE 'target:%' AND value NOT IN (${alive})`);
+    const questions = run(
+      `DELETE FROM questions WHERE session_key NOT IN (${alive}) OR (status <> 'open' AND asked_at < $cutoff)`,
+    );
+    const inbox = run(
+      `DELETE FROM inbox WHERE session_key NOT IN (${alive}) OR (read_at IS NOT NULL AND read_at < $cutoff)`,
+    );
+    const links = run(
+      `DELETE FROM message_links WHERE session_key NOT IN (${alive})
+         OR (question_id IS NOT NULL AND question_id NOT IN (SELECT id FROM questions))
+         OR (inbox_id IS NOT NULL AND inbox_id NOT IN (SELECT id FROM inbox))
+         OR (question_id IS NULL AND inbox_id IS NULL AND created_at < $cutoff)`,
+    );
+    const sessions = run('DELETE FROM sessions WHERE last_seen_at < $cutoff');
+    return { sessions, questions, inbox, links, targets };
+  }
+
+  private counts(): PurgeCounts {
+    const count = (sql: string) => this.db.query<{ n: number }, []>(sql).get()?.n ?? 0;
+    return {
+      sessions: count('SELECT count(*) AS n FROM sessions'),
+      questions: count('SELECT count(*) AS n FROM questions'),
+      inbox: count('SELECT count(*) AS n FROM inbox'),
+      links: count('SELECT count(*) AS n FROM message_links'),
+      targets: count("SELECT count(*) AS n FROM kv WHERE key LIKE 'target:%'"),
+    };
+  }
+
+  private dbBytes(): number {
+    const pages = this.db.query<{ page_count: number }, []>('PRAGMA page_count').get()?.page_count ?? 0;
+    const size = this.db.query<{ page_size: number }, []>('PRAGMA page_size').get()?.page_size ?? 0;
+    return pages * size;
   }
 
   private static toSession(r: SessionRow): Session {

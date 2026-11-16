@@ -187,6 +187,115 @@ describe('SqliteStore: время связи (v5)', () => {
   });
 });
 
+describe('SqliteStore: очистка', () => {
+  const DAY = 86_400_000;
+  const now = Date.now();
+  const cutoff = now - 14 * DAY;
+  const old = now - 20 * DAY;
+  const fresh = now - DAY;
+  const live = { ...ref, root: '/live' };
+  const dead = { ...ref, root: '/dead' };
+  const liveKey = Session.keyOf(live);
+  const deadKey = Session.keyOf(dead);
+
+  /** Вопрос сессии, заданный в `at`; `answered` — человек ответил сразу. */
+  function asked(store: SqliteStore, id: string, sessionKey: string, at: number, answered: boolean) {
+    const q = question(id, sessionKey);
+    const state = { ...q.toState(), askedAt: at, deadlineAt: at + 180_000 };
+    const restored = Question.restore(state);
+    if (answered) restored.answer({ option: 'A' }, at + 1);
+    store.saveQuestion(restored);
+    store.saveLink({ chatId: 111, messageId: Number(id.slice(1)), sessionKey, questionId: id });
+  }
+
+  /** Входящее сессии, созданное в `at`; `readAt` — прочитано. */
+  function posted(store: SqliteStore, id: string, sessionKey: string, at: number, readAt?: number) {
+    const i = item(id, at, sessionKey);
+    store.saveInboxItem(readAt === undefined ? i : InboxItem.restore({ ...i.toState(), readAt }));
+    store.saveLink({ chatId: 111, messageId: 500 + Number(id.slice(1)), sessionKey, inboxId: id });
+  }
+
+  function seed() {
+    const store = SqliteStore.open(':memory:');
+    store.saveSession(Session.open({ ...live }, fresh));
+    store.saveSession(Session.open({ ...dead }, old));
+    store.setTelegramOffset(42);
+    // мёртвая сессия: всё уходит вместе с ней, даже открытое и непрочитанное
+    asked(store, 'q1', deadKey, fresh, false);
+    posted(store, 'i1', deadKey, fresh);
+    store.saveLink({ chatId: 111, messageId: 900, sessionKey: deadKey });
+    store.setChatTarget(111, deadKey);
+    // живая сессия
+    asked(store, 'q2', liveKey, old, true); // решён давно — удаляется
+    asked(store, 'q3', liveKey, fresh, true); // решён недавно — остаётся
+    asked(store, 'q4', liveKey, old, false); // открыт давно — остаётся
+    posted(store, 'i2', liveKey, old, old); // прочитан давно — удаляется
+    posted(store, 'i3', liveKey, old, fresh); // прочитан недавно — остаётся
+    posted(store, 'i4', liveKey, old); // не прочитан — остаётся
+    store.saveLink({ chatId: 111, messageId: 901, sessionKey: liveKey }); // уведомление — свежее
+    store.setChatTarget(222, liveKey);
+    return store;
+  }
+
+  test('мёртвая сессия уходит со всем своим; у живой — решённое и прочитанное старше срока', () => {
+    const store = seed();
+    const report = store.purge(cutoff);
+
+    expect(report.deleted).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1 });
+    expect(report.remaining).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1 });
+    expect(report.dbBytes).toBeGreaterThan(0);
+
+    expect(store.session(deadKey)).toBeUndefined();
+    expect(store.session(liveKey)).toBeDefined();
+    expect(['q1', 'q2', 'q3', 'q4'].map((id) => store.question(id) !== undefined)).toEqual([false, false, true, true]);
+    expect(store.inbox(deadKey, ['i1']).pending()).toEqual([]);
+    expect(
+      store
+        .inbox(liveKey, ['i2', 'i3', 'i4'])
+        .ack(['i3', 'i4'], now)
+        .map((i) => i.id),
+    ).toEqual(['i4']);
+    expect(() => store.inbox(liveKey, ['i2']).ack(['i2'], now)).toThrow();
+
+    expect(store.link(111, 1)).toBeUndefined(); // q1
+    expect(store.link(111, 2)).toBeUndefined(); // q2
+    expect(store.link(111, 501)).toBeUndefined(); // i1
+    expect(store.link(111, 502)).toBeUndefined(); // i2
+    expect(store.link(111, 900)).toBeUndefined(); // уведомление мёртвой сессии
+    expect([3, 4, 503, 504, 901].map((m) => store.link(111, m) !== undefined)).toEqual([true, true, true, true, true]);
+
+    expect(store.chatTarget(111)).toBeUndefined();
+    expect(store.chatTarget(222)).toBe(liveKey);
+    expect(store.telegramOffset()).toBe(42);
+  });
+
+  test('связь уведомления — по своему времени; связи оставшихся вопросов и входящих живут с ними', () => {
+    const store = SqliteStore.open(':memory:');
+    const later = Date.now() + DAY;
+    store.saveSession(Session.open({ ...live }, later));
+    asked(store, 'q4', liveKey, later, false);
+    posted(store, 'i4', liveKey, later);
+    store.saveLink({ chatId: 111, messageId: 901, sessionKey: liveKey });
+
+    const report = store.purge(Date.now() + 1000);
+    expect(report.deleted).toEqual({ sessions: 0, questions: 0, inbox: 0, links: 1, targets: 0 });
+    expect(store.link(111, 901)).toBeUndefined();
+    expect(store.link(111, 4)).toBeDefined();
+    expect(store.link(111, 504)).toBeDefined();
+  });
+
+  test('dryRun — те же счётчики (и «останется»), ничего не удалено; повторная очистка — нули', () => {
+    const store = seed();
+    const dry = store.purge(cutoff, { dryRun: true });
+    expect(dry.deleted).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1 });
+    expect(dry.remaining).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1 });
+    expect(store.session(deadKey)).toBeDefined();
+
+    store.purge(cutoff);
+    expect(store.purge(cutoff).deleted).toEqual({ sessions: 0, questions: 0, inbox: 0, links: 0, targets: 0 });
+  });
+});
+
 describe('SqliteStore: offset Telegram и транзакции', () => {
   test('offset по умолчанию 0, затем сохраняется', () => {
     const store = SqliteStore.open(':memory:');

@@ -15,6 +15,22 @@ export interface MessageLink {
   inboxId?: string;
 }
 
+/** Сколько записей по видам: сессии, вопросы, входящие, связи с сообщениями, выбранные адресаты чатов. */
+export interface PurgeCounts {
+  sessions: number;
+  questions: number;
+  inbox: number;
+  links: number;
+  targets: number;
+}
+
+/** Итог очистки: удалено (при `dryRun` — было бы удалено), осталось, размер базы в байтах. */
+export interface PurgeReport {
+  deleted: PurgeCounts;
+  remaining: PurgeCounts;
+  dbBytes: number;
+}
+
 /** Порт хранилища для сценариев. Реализация — `infra/sqlite-store.ts`. Сохранение — upsert по id. */
 export interface Store {
   transaction<T>(fn: () => T): T;
@@ -39,6 +55,12 @@ export interface Store {
   /** Сессия, выбранная в `/sessions`: следующий текст чата — её указание. */
   chatTarget(chatId: number): string | undefined;
   setChatTarget(chatId: number, sessionKey: string | undefined): void;
+
+  /**
+   * Удалить записи старше границы `cutoff` (мс эпохи) по правилам `docs/model.md`, «Хранение»; одной транзакцией.
+   * `dryRun` — только посчитать.
+   */
+  purge(cutoff: number, options?: { dryRun?: boolean }): PurgeReport;
 
   /** offset `getUpdates`: следующий ожидаемый update_id. */
   telegramOffset(): number;
