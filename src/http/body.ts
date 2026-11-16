@@ -1,4 +1,4 @@
-import type { QuestionOption } from '../domain/question.ts';
+import type { Choice, ItemAnswer, ItemDraft, QuestionOption } from '../domain/question.ts';
 import type { SessionRef } from '../domain/session.ts';
 
 /** Неверный запрос: не JSON, нет поля, неверный тип. → 400. */
@@ -69,6 +69,54 @@ export class RequestBody {
       throw new BadRequestError(`поле «${name}» — ожидается массив { id, text }`);
     }
     return value.map((o) => ({ id: o.id, text: o.text }));
+  }
+
+  /** Пункты пачки `[{ text, options?, recommended? }]`; нет поля — `undefined`. */
+  optionalItems(name = 'questions'): ItemDraft[] | undefined {
+    const value = this.data[name];
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value) || !value.every(RequestBody.isObject)) {
+      throw new BadRequestError(`поле «${name}» — ожидается массив { text, options?, recommended? }`);
+    }
+    return value.map((raw, i) => {
+      const item = new RequestBody(raw);
+      try {
+        const recommended = item.optionalString('recommended');
+        return {
+          text: item.string('text'),
+          options: item.options(),
+          ...(recommended !== undefined && { recommended }),
+        };
+      } catch (error) {
+        throw new BadRequestError(`${name}[${i}]: ${(error as Error).message}`);
+      }
+    });
+  }
+
+  /** Ответы по пунктам `[{ item, option | text }]`; нет поля — `undefined`. */
+  optionalAnswers(name = 'answers'): ItemAnswer[] | undefined {
+    const value = this.data[name];
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value) || !value.every(RequestBody.isObject)) {
+      throw new BadRequestError(`поле «${name}» — ожидается массив { item, option | text }`);
+    }
+    return value.map((raw, i) => {
+      const n = raw.item;
+      if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1) {
+        throw new BadRequestError(`${name}[${i}]: поле «item» — ожидается номер пункта ≥ 1`);
+      }
+      const choice = new RequestBody(raw).optionalChoice();
+      if (!choice) throw new BadRequestError(`${name}[${i}]: нужно поле «option» или «text»`);
+      return { item: n, choice };
+    });
+  }
+
+  /** Ответ `option` или `text`; нет обоих — `undefined`. */
+  optionalChoice(): Choice | undefined {
+    const option = this.optionalString('option');
+    if (option !== undefined) return { option };
+    const text = this.optionalString('text');
+    return text !== undefined ? { text } : undefined;
   }
 
   session(name = 'session'): SessionRef {

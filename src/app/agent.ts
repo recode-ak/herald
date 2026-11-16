@@ -117,6 +117,27 @@ export class AgentService {
     return question;
   }
 
+  /**
+   * Человек ответит в терминале (попросил агента там): вопрос `id` или, без него, все открытые вопросы сессии.
+   * Во входящие не кладётся — перевёл сам агент; сообщения перерисованы, ожидание вопросов просыпается.
+   */
+  async toTerminal(caller: Caller, id?: string): Promise<Question[]> {
+    const session = this.enter(caller);
+    const questions = id !== undefined ? [this.ownQuestion(caller, id)] : this.deps.store.openQuestions(session.key);
+    const now = this.deps.clock.now();
+    this.deps.store.transaction(() => {
+      for (const q of questions) {
+        q.moveToTerminal(now);
+        this.deps.store.saveQuestion(q);
+      }
+    });
+    for (const q of questions) {
+      this.deps.waiter.notify(Waiter.questionTopic(q.id));
+      await this.notices.refreshQuestion(q, session);
+    }
+    return questions;
+  }
+
   /** Статус сессии. В Telegram не отправляется. */
   async status(caller: Caller, text: string): Promise<void> {
     const session = this.enter(caller);
@@ -173,7 +194,7 @@ export class AgentService {
   }
 
   /**
-   * Ждать ответа на вопрос до `timeoutMs`; возвращает вопрос (открытый — по таймауту).
+   * Ждать ответа на вопрос до `timeoutMs`; возвращает вопрос (открытый — по таймауту или переведённый в терминал).
    * Ответ человека, полученный так, отмечается прочитанным — во входящих он не повторится.
    */
   async awaitQuestion(caller: Caller, questionId: string, timeoutMs: number): Promise<Question> {
@@ -181,6 +202,7 @@ export class AgentService {
     const deadline = this.deps.clock.now() + timeoutMs;
     for (;;) {
       const question = this.ownQuestion(caller, questionId);
+      if (question.status === 'open' && question.terminalAt !== undefined) return question;
       if (question.status !== 'open') {
         const answers = this.deps.store
           .inbox(session.key)

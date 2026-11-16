@@ -229,6 +229,86 @@ describe('Вопрос', () => {
   });
 });
 
+describe('Пачка вопросов и перевод в терминал', () => {
+  const questions = [
+    { text: 'База?', options: db.options, recommended: 'A' },
+    { text: 'Порт?' },
+    { text: 'Логи?', options: [{ id: 'A', text: 'stderr' }], recommended: 'A' },
+  ];
+
+  test('ask с questions → пачка; ответы по пунктам будят ожидание, когда отвечены все', async () => {
+    const k = setup();
+    const asked = await k.call('/v1/ask', { session, questions, timeoutMs: 60_000 });
+    expect(asked.status).toBe(200);
+    const q = asked.json.question as QuestionWire;
+    expect(q.items.map((i) => i.text)).toEqual(['База?', 'Порт?', 'Логи?']);
+    expect(q.deadlineAt).toBe(q.askedAt + 60_000);
+
+    const waiting = k.call('/v1/question', { session, id: q.id, waitMs: 10_000 });
+    await k.sleeping();
+    await k.press(k.telegram.last(NUR_CHAT)!.messageId, `b:${q.id}:1:B`);
+    await k.reply('80', k.telegram.last(NUR_CHAT)!.messageId);
+    await k.press(k.telegram.last(NUR_CHAT)!.messageId, `b:${q.id}:3:A`);
+    const done = (await waiting).json.question as QuestionWire;
+    expect(done.status).toBe('answered');
+    expect(done.items.map((i) => i.resolution?.option ?? i.resolution?.text)).toEqual(['B', '80', 'A']);
+  });
+
+  test('decide и answered с answers; answers: [] — рекомендованные; неверные answers — 400', async () => {
+    const k = setup();
+    const id = ((await k.call('/v1/ask', { session, questions, timeoutMs: 60_000 })).json.question as QuestionWire).id;
+    expect((await k.call('/v1/decide', { session, id, answers: [{ item: 'x' }], reason: 'r' })).status).toBe(400);
+    expect((await k.call('/v1/decide', { session, id, answers: [{ item: 2 }], reason: 'r' })).status).toBe(400);
+    const decided = await k.call('/v1/decide', {
+      session,
+      id,
+      answers: [{ item: 2, text: '80' }],
+      reason: 'по таймауту',
+    });
+    expect(decided.status).toBe(200);
+    expect((decided.json.question as QuestionWire).items.map((i) => i.resolution?.by)).toEqual([
+      'agent',
+      'agent',
+      'agent',
+    ]);
+
+    const other = ((await k.call('/v1/ask', { session, questions })).json.question as QuestionWire).id;
+    const answered = await k.call('/v1/answered', {
+      session,
+      id: other,
+      answers: [
+        { item: 1, option: 'A' },
+        { item: 2, text: '80' },
+        { item: 3, option: 'A' },
+      ],
+    });
+    expect((answered.json.question as QuestionWire).status).toBe('answered');
+  });
+
+  test('to-terminal: без id — все открытые вопросы сессии, с id — один; во входящие не кладётся; ожидание вопроса просыпается', async () => {
+    const k = setup();
+    const first = ((await k.call('/v1/ask', { session, ...db })).json.question as QuestionWire).id;
+    const second = ((await k.call('/v1/ask', { session, questions })).json.question as QuestionWire).id;
+    const waiting = k.call('/v1/question', { session, id: first, waitMs: 10_000 });
+    await k.sleeping();
+
+    const moved = await k.call('/v1/to-terminal', { session });
+    expect(moved.status).toBe(200);
+    expect((moved.json.questions as QuestionWire[]).map((q) => q.id)).toEqual([first, second]);
+    const woke = (await waiting).json.question as QuestionWire;
+    expect(woke.status).toBe('open');
+    expect(woke.terminalAt).toBeDefined();
+    expect(k.telegram.last(NUR_CHAT)?.text).toEndWith(
+      '🖥 Переведено в терминал — ответь там; reply здесь тоже примется.',
+    );
+    expect(((await k.call('/v1/inbox', { session })).json.items as InboxItemWire[]).length).toBe(0);
+
+    const third = ((await k.call('/v1/ask', { session, ...db })).json.question as QuestionWire).id;
+    const one = await k.call('/v1/to-terminal', { session, id: third });
+    expect((one.json.questions as QuestionWire[]).map((q) => q.id)).toEqual([third]);
+  });
+});
+
 describe('Статус и входящие', () => {
   test('status — без отправки в Telegram', async () => {
     const k = setup();

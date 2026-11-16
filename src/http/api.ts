@@ -4,7 +4,7 @@ import { TelegramError } from '../app/telegram.ts';
 import type { Access } from '../domain/access.ts';
 import { DomainError } from '../domain/errors.ts';
 import { InboxItem } from '../domain/inbox.ts';
-import type { Choice } from '../domain/question.ts';
+import type { Choice, ItemAnswer } from '../domain/question.ts';
 import { BadRequestError, RequestBody } from './body.ts';
 import { Wire } from './wire.ts';
 
@@ -44,14 +44,13 @@ export class HttpApi {
       [
         '/v1/ask',
         async (c, b) => {
-          const recommended = b.optionalString('recommended');
           const timeoutMs = b.optionalMs('timeoutMs');
-          const input = {
-            text: b.string('text'),
-            options: b.options(),
-            ...(recommended !== undefined && { recommended }),
-            ...(timeoutMs !== undefined && { timeoutMs }),
-          };
+          const items = b.optionalItems();
+          const recommended = b.optionalString('recommended');
+          const question = items
+            ? { items }
+            : { text: b.string('text'), options: b.options(), ...(recommended !== undefined && { recommended }) };
+          const input = { ...question, ...(timeoutMs !== undefined && { timeoutMs }) };
           return { question: Wire.question(await agent.ask(c, input)) };
         },
       ],
@@ -62,12 +61,16 @@ export class HttpApi {
       [
         '/v1/decide',
         async (c, b) => ({
-          question: Wire.question(await agent.decide(c, b.string('id'), HttpApi.choice(b), b.string('reason'))),
+          question: Wire.question(await agent.decide(c, b.string('id'), HttpApi.answers(b), b.string('reason'))),
         }),
       ],
       [
         '/v1/answered',
-        async (c, b) => ({ question: Wire.question(await agent.answered(c, b.string('id'), HttpApi.choice(b))) }),
+        async (c, b) => ({ question: Wire.question(await agent.answered(c, b.string('id'), HttpApi.answers(b))) }),
+      ],
+      [
+        '/v1/to-terminal',
+        async (c, b) => ({ questions: (await agent.toTerminal(c, b.optionalString('id'))).map(Wire.question) }),
       ],
       ['/v1/status', (c, b) => agent.status(c, b.string('text'))],
       ['/v1/title', (c, b) => agent.title(c, b.string('text'))],
@@ -117,12 +120,13 @@ export class HttpApi {
     return Math.min(body.waitMs(), this.deps.maxWaitMs);
   }
 
-  private static choice(body: RequestBody): Choice {
-    const option = body.optionalString('option');
-    if (option !== undefined) return { option };
-    const text = body.optionalString('text');
-    if (text !== undefined) return { text };
-    throw new BadRequestError('нужно поле «option» или «text»');
+  /** Ответы по пунктам (`answers`) или одиночный ответ (`option` / `text`). */
+  private static answers(body: RequestBody): Choice | ItemAnswer[] {
+    const answers = body.optionalAnswers();
+    if (answers) return answers;
+    const choice = body.optionalChoice();
+    if (choice) return choice;
+    throw new BadRequestError('нужно поле «answers», «option» или «text»');
   }
 
   private failure(error: unknown): Response {
