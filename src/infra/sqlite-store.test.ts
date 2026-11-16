@@ -147,6 +147,46 @@ describe('SqliteStore: связи сообщений', () => {
   });
 });
 
+describe('SqliteStore: время связи (v5)', () => {
+  const createdAt = (path: string) => {
+    const raw = new Database(path, { readonly: true });
+    const rows = raw
+      .query<{ message_id: number; created_at: number }, []>(
+        'SELECT message_id, created_at FROM message_links ORDER BY message_id',
+      )
+      .all();
+    raw.close();
+    return rows;
+  };
+
+  test('миграция с v4: старые связи живы и получают время миграции; новая — время сохранения', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'herald-mig-'));
+    const path = join(dir, 'v4.db');
+    const v4 = new Database(path, { create: true });
+    v4.run(`CREATE TABLE message_links (chat_id INTEGER NOT NULL, message_id INTEGER NOT NULL,
+      session_key TEXT NOT NULL, question_id TEXT, inbox_id TEXT, PRIMARY KEY (chat_id, message_id))`);
+    v4.run(`INSERT INTO message_links VALUES (111, 1, 'laptop:/x', 'q1', NULL)`);
+    v4.run('PRAGMA user_version = 4');
+    v4.close();
+
+    const before = Date.now();
+    const store = SqliteStore.open(path);
+    expect(store.link(111, 1)).toEqual({ chatId: 111, messageId: 1, sessionKey: 'laptop:/x', questionId: 'q1' });
+    expect(store.linksOfQuestion('q1')).toHaveLength(1);
+    store.saveLink({ chatId: 111, messageId: 2, sessionKey: 'laptop:/x' });
+    const after = Date.now();
+    store.close();
+
+    const rows = createdAt(path);
+    expect(rows.map((r) => r.message_id)).toEqual([1, 2]);
+    for (const r of rows) {
+      expect(r.created_at).toBeGreaterThanOrEqual(before - 1);
+      expect(r.created_at).toBeLessThanOrEqual(after + 1);
+    }
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 describe('SqliteStore: offset Telegram и транзакции', () => {
   test('offset по умолчанию 0, затем сохраняется', () => {
     const store = SqliteStore.open(':memory:');

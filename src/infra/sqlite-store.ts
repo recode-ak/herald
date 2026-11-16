@@ -5,7 +5,11 @@ import { Inbox, InboxItem, type InboxKind } from '../domain/inbox.ts';
 import { Question, type QuestionStatus } from '../domain/question.ts';
 import { Session } from '../domain/session.ts';
 
-/** Схема: v1 — таблицы, v2 — название сессии, v3 — закрытие окна, v4 — срок вопроса. Версия — `PRAGMA user_version`; следующая — новый элемент массива. */
+/**
+ * Схема: v1 — таблицы, v2 — название сессии, v3 — закрытие окна, v4 — срок вопроса,
+ * v5 — время связи с сообщением (для очистки; ставит SQLite при сохранении; ALTER не умеет DEFAULT-выражение —
+ * таблица пересоздаётся). Версия — `PRAGMA user_version`; следующая — новый элемент массива.
+ */
 const MIGRATIONS = [
   `
   CREATE TABLE sessions (
@@ -66,6 +70,27 @@ const MIGRATIONS = [
   'ALTER TABLE sessions ADD COLUMN title TEXT;',
   'ALTER TABLE sessions ADD COLUMN closed_at INTEGER;',
   'ALTER TABLE questions ADD COLUMN deadline_at INTEGER;',
+  `
+  CREATE TABLE IF NOT EXISTS message_links (
+    chat_id INTEGER NOT NULL, message_id INTEGER NOT NULL, session_key TEXT NOT NULL,
+    question_id TEXT, inbox_id TEXT, PRIMARY KEY (chat_id, message_id)
+  );
+  CREATE TABLE message_links_v5 (
+    chat_id INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    session_key TEXT NOT NULL,
+    question_id TEXT,
+    inbox_id TEXT,
+    created_at INTEGER NOT NULL DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)),
+    PRIMARY KEY (chat_id, message_id)
+  );
+  INSERT INTO message_links_v5 (chat_id, message_id, session_key, question_id, inbox_id)
+    SELECT chat_id, message_id, session_key, question_id, inbox_id FROM message_links;
+  DROP TABLE message_links;
+  ALTER TABLE message_links_v5 RENAME TO message_links;
+  CREATE INDEX message_links_question ON message_links (question_id);
+  CREATE INDEX message_links_inbox ON message_links (inbox_id);
+  `,
 ];
 
 interface SessionRow {
