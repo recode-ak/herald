@@ -3,6 +3,7 @@ import type { Session } from '../domain/session.ts';
 import type { Keyboard } from './telegram.ts';
 
 /** Тексты и кнопки сообщений бота. Без parse_mode — экранирование не нужно. */
+// biome-ignore lint/complexity/noStaticOnlyClass: правило проекта — класс с зоной ответственности вместо россыпи функций
 export class Messages {
   static readonly CALLBACK_MAX_BYTES = 64;
 
@@ -52,6 +53,43 @@ export class Messages {
 
   static inboxRead(session: Session): string {
     return `✅ прочитано агентом · сессия ${session.project}`;
+  }
+
+  /** Строка `/sessions`: давность активности и последний статус. */
+  static sessionLine(session: Session, now: number): string {
+    const status = session.status ? ` — ${session.status.text} (${Messages.ago(session.status.at, now)})` : '';
+    return `• ${session.host} · ${session.project} — ${Messages.ago(session.lastSeenAt, now)}${status}`;
+  }
+
+  /** Строка `/status`: последний статус с давностью. */
+  static statusLine(session: Session, now: number): string {
+    const status = session.status
+      ? `${session.status.text} (${Messages.ago(session.status.at, now)})`
+      : `статуса нет (${Messages.ago(session.lastSeenAt, now)})`;
+    return `• ${session.host} · ${session.project} — ${status}`;
+  }
+
+  static sessionButton(session: Session): string {
+    return `${session.project} · ${session.host}`;
+  }
+
+  static readonly NO_SESSIONS = 'Активных сессий нет.';
+  static readonly WHOM = 'Кому? Ответь reply на сообщение сессии или выбери адресата в /sessions.';
+
+  static ago(at: number, now: number): string {
+    const minutes = Math.floor((now - at) / 60_000);
+    if (minutes < 1) return 'только что';
+    if (minutes < 60) return `${minutes} мин назад`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} ч назад`;
+    return `${Math.floor(hours / 24)} дн назад`;
+  }
+
+  /** Текст ответа во входящих: вариант с подписью или свободный текст. */
+  static answerText(question: Question, r: Resolution): string {
+    if (r.option === undefined) return r.text ?? '';
+    const option = question.options.find((o) => o.id === r.option);
+    return option ? `${option.id}: ${option.text}` : r.option;
   }
 
   private static choice(r: Resolution): string {

@@ -1,0 +1,286 @@
+import { describe, expect, test } from 'bun:test';
+import { Session } from '../domain/session.ts';
+import { AgentService } from './agent.ts';
+import { HumanService } from './human.ts';
+import type { TelegramUpdate } from './telegram.ts';
+import { ANN_CHAT, ann, NUR_CHAT, nur, testkit } from './testkit.fake.ts';
+
+const HOUR = 3_600_000;
+const nurKey = Session.keyOf(nur.session);
+const ops = { ...nur, session: { host: 'server', root: '/srv/chronicle' } };
+const db = {
+  text: 'Какую БД?',
+  options: [
+    { id: 'A', text: 'SQLite' },
+    { id: 'B', text: 'Postgres' },
+  ],
+  recommended: 'A',
+};
+
+function setup() {
+  const kit = testkit();
+  let updateId = 0;
+  const human = new HumanService({ ...kit, activeWindowMs: 24 * HOUR });
+  return {
+    ...kit,
+    agent: new AgentService(kit),
+    human,
+    /** Нажатие кнопки на сообщении. */
+    press: (chatId: number, messageId: number, data: string) =>
+      human.handle({ kind: 'callback', updateId: ++updateId, callbackId: `cb${updateId}`, chatId, messageId, data }),
+    /** Текст человека; `replyTo` — reply на сообщение. */
+    say: (chatId: number, text: string, replyTo?: number) => {
+      const update: TelegramUpdate = {
+        kind: 'message',
+        updateId: ++updateId,
+        chatId,
+        messageId: 1000 + updateId,
+        text,
+      };
+      return human.handle(replyTo === undefined ? update : { ...update, replyTo });
+    },
+  };
+}
+
+describe('Ответы на вопрос', () => {
+  test('кнопка варианта → ответ во входящих, сообщение обновлено, отметка «в ящике»', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, db);
+    const qMsg = k.telegram.last(NUR_CHAT)!;
+
+    await k.press(NUR_CHAT, qMsg.messageId, `a:${q.id}:B`);
+
+    expect(k.store.question(q.id)?.status).toBe('answered');
+    const [item] = await k.agent.inbox(nur);
+    expect(item?.toState()).toMatchObject({ kind: 'answer', questionId: q.id, option: 'B', text: 'B: Postgres' });
+    expect(k.telegram.message(NUR_CHAT, qMsg.messageId)?.text).toEndWith('\n\n👤 Принят B.');
+    expect(k.telegram.callbackAnswers.at(-1)).toEqual({ callbackId: 'cb1', text: 'Принят B' });
+
+    const mark = k.telegram.last(NUR_CHAT)!;
+    expect(mark).toMatchObject({ text: '📥 в ящике сессии u7-school', replyTo: qMsg.messageId });
+    expect(k.store.link(NUR_CHAT, mark.messageId)).toMatchObject({ sessionKey: nurKey, inboxId: item!.id });
+  });
+
+  test('reply на вопрос → свободный ответ', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, db);
+    await k.say(NUR_CHAT, 'возьми Postgres, но позже', k.telegram.last(NUR_CHAT)!.messageId);
+
+    expect(k.store.question(q.id)?.resolution).toMatchObject({ by: 'human', text: 'возьми Postgres, но позже' });
+    const [item] = await k.agent.inbox(nur);
+    expect(item?.toState()).toMatchObject({ kind: 'answer', questionId: q.id, text: 'возьми Postgres, но позже' });
+    expect(item?.option).toBeUndefined();
+  });
+
+  test('ответ после decide → late-answer, первое решение сохранено', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, db);
+    const qMsg = k.telegram.last(NUR_CHAT)!;
+    await k.agent.decide(nur, q.id, { option: 'A' }, 'по таймауту');
+
+    await k.press(NUR_CHAT, qMsg.messageId, `a:${q.id}:B`);
+
+    const stored = k.store.question(q.id)!;
+    expect(stored.status).toBe('decided');
+    expect(stored.resolution?.option).toBe('A');
+    const [item] = await k.agent.inbox(nur);
+    expect(item?.toState()).toMatchObject({ kind: 'late-answer', questionId: q.id, option: 'B' });
+    expect(k.telegram.message(NUR_CHAT, qMsg.messageId)?.text).toEndWith('\n🔁 Переигрывание: Принят B.');
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe(`Переигрывание вопроса ${q.id}: B`);
+  });
+
+  test('«Жди меня» — агенту решать нельзя, в сообщении пометка', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, db);
+    const qMsg = k.telegram.last(NUR_CHAT)!;
+    await k.press(NUR_CHAT, qMsg.messageId, `h:${q.id}`);
+
+    expect(k.store.question(q.id)?.heldAt).toBeDefined();
+    expect(k.telegram.message(NUR_CHAT, qMsg.messageId)?.text).toEndWith('⏸ Агент ждёт твоего ответа.');
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('Агент подождёт');
+    await expect(k.agent.decide(nur, q.id, { option: 'A' }, 'по таймауту')).rejects.toThrow('просил ждать');
+  });
+
+  test('«Жди меня» на решённом вопросе — подсказка, без ошибки', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, db);
+    await k.agent.decide(nur, q.id, { option: 'A' }, 'по таймауту');
+    await k.press(NUR_CHAT, k.telegram.last(NUR_CHAT)!.messageId, `h:${q.id}`);
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe(`⚠️ вопрос ${q.id} уже решён`);
+  });
+});
+
+describe('Указания', () => {
+  test('reply на уведомление сессии → указание этой сессии', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'Фаза 2 готова');
+    await k.agent.notify(ops, 'бэкап сделан');
+    const nurMsg = k.telegram.sentTo(NUR_CHAT)[0]!;
+
+    await k.say(NUR_CHAT, 'не трогай миграции', nurMsg.messageId);
+
+    expect((await k.agent.inbox(nur)).map((i) => [i.kind, i.text])).toEqual([['directive', 'не трогай миграции']]);
+    expect(await k.agent.inbox(ops)).toEqual([]);
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('📥 в ящике сессии u7-school');
+  });
+
+  test('reply на отметку «в ящике» — тоже указание той же сессии', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    await k.say(NUR_CHAT, 'раз', k.telegram.last(NUR_CHAT)!.messageId);
+    await k.say(NUR_CHAT, 'два', k.telegram.last(NUR_CHAT)!.messageId);
+    expect((await k.agent.inbox(nur)).map((i) => i.text)).toEqual(['раз', 'два']);
+  });
+
+  test('/sessions → кнопка сессии → следующий текст — её указание (один раз)', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    await k.agent.notify(ops, 'y');
+
+    await k.say(NUR_CHAT, '/sessions');
+    const menu = k.telegram.last(NUR_CHAT)!;
+    const opsButton = menu.buttons!.flat().find((b) => b.text.includes('chronicle'))!;
+    await k.press(NUR_CHAT, menu.messageId, opsButton.data);
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('Адресат: chronicle');
+
+    await k.say(NUR_CHAT, 'перезапусти pm2');
+    expect((await k.agent.inbox(ops)).map((i) => i.text)).toEqual(['перезапусти pm2']);
+    expect(await k.agent.inbox(nur)).toEqual([]);
+
+    await k.say(NUR_CHAT, 'ещё');
+    expect(await k.agent.inbox(ops)).toHaveLength(1);
+    expect(k.telegram.last(NUR_CHAT)?.text).toStartWith('Кому?');
+  });
+
+  test('текст без reply и без адресата — подсказка, во входящие не попадает', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    await k.say(NUR_CHAT, 'привет');
+    expect(await k.agent.inbox(nur)).toEqual([]);
+    expect(k.telegram.last(NUR_CHAT)?.text).toStartWith('Кому?');
+  });
+
+  test('reply на сообщение, не связанное с сессией, — подсказка', async () => {
+    const k = setup();
+    await k.say(NUR_CHAT, 'что это', 999);
+    expect(k.telegram.last(NUR_CHAT)?.text).toStartWith('Кому?');
+  });
+});
+
+describe('/sessions и /status', () => {
+  test('/sessions — активные сессии с давностью и статусом, недавние первыми', async () => {
+    const k = setup();
+    await k.agent.status(ops, 'бэкап');
+    k.clock.advance(25 * HOUR);
+    await k.agent.status(nur, 'Фаза 2: сценарии');
+    k.clock.advance(5 * 60_000);
+    await k.agent.notify({ ...nur, session: { host: 'laptop', root: '/home/nur/dev/herald' } }, 'x');
+    k.clock.advance(2 * HOUR);
+
+    await k.say(NUR_CHAT, '/sessions');
+    const menu = k.telegram.last(NUR_CHAT)!;
+    expect(menu.text).toBe(
+      [
+        'Активные сессии:',
+        '• laptop · herald — 2 ч назад',
+        '• laptop · u7-school — 2 ч назад — Фаза 2: сценарии (2 ч назад)',
+        '',
+        'Выбери адресата указания.',
+      ].join('\n'),
+    );
+    expect(menu.buttons!.map((row) => row.map((b) => b.text))).toEqual([['herald · laptop'], ['u7-school · laptop']]);
+    for (const b of menu.buttons!.flat()) expect(Buffer.byteLength(b.data)).toBeLessThanOrEqual(64);
+  });
+
+  test('/status — статусы активных сессий без участия агента', async () => {
+    const k = setup();
+    await k.agent.status(nur, 'Фаза 2');
+    k.clock.advance(30_000);
+    await k.say(NUR_CHAT, '/status');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('• laptop · u7-school — Фаза 2 (только что)');
+  });
+
+  test('/status reply на сообщение сессии — только эта сессия', async () => {
+    const k = setup();
+    await k.agent.status(nur, 'Фаза 2');
+    await k.agent.status(ops, 'бэкап');
+    await k.agent.notify(ops, 'y');
+    k.clock.advance(3 * 60_000);
+    await k.say(NUR_CHAT, '/status', k.telegram.last(NUR_CHAT)!.messageId);
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('• server · chronicle — бэкап (3 мин назад)');
+  });
+
+  test('нет активных сессий', async () => {
+    const k = setup();
+    await k.say(NUR_CHAT, '/sessions');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('Активных сессий нет.');
+    await k.say(NUR_CHAT, '/status');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('Активных сессий нет.');
+  });
+
+  test('сессия без статуса в /status', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    k.clock.advance(3 * 24 * HOUR - 1);
+    const human = new HumanService({ ...k, activeWindowMs: 7 * 24 * HOUR });
+    await human.handle({ kind: 'message', updateId: 1, chatId: NUR_CHAT, messageId: 50, text: '/status' });
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('• laptop · u7-school — статуса нет (2 дн назад)');
+  });
+});
+
+describe('Доступ (КП 7)', () => {
+  test('чужой chat_id — ничего не принимается и не отправляется', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, db);
+    const qMsg = k.telegram.last(NUR_CHAT)!;
+    const sent = k.telegram.sentTo(NUR_CHAT).length;
+
+    await k.say(-555, 'стоп', qMsg.messageId);
+    await k.say(-555, '/sessions');
+    await k.press(-555, qMsg.messageId, `a:${q.id}:B`);
+
+    expect(k.store.question(q.id)?.status).toBe('open');
+    expect(await k.agent.inbox(nur)).toEqual([]);
+    expect(k.telegram.sentTo(-555)).toEqual([]);
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(sent);
+    expect(k.telegram.callbackAnswers.at(-1)).toEqual({ callbackId: 'cb3' });
+  });
+
+  test('кнопка вопроса чужого человека — отказ', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, db);
+    await k.press(ANN_CHAT, 1, `a:${q.id}:B`);
+    expect(k.store.question(q.id)?.status).toBe('open');
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toStartWith('⛔');
+  });
+
+  test('reply на сообщение чужой сессии — отказ', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    const nurMsg = k.telegram.last(NUR_CHAT)!;
+    // Связь чужого сообщения подложена в чат Ann (тот же message_id в её чате).
+    k.store.saveLink({ chatId: ANN_CHAT, messageId: nurMsg.messageId, sessionKey: nurKey });
+    await k.say(ANN_CHAT, 'стоп', nurMsg.messageId);
+    expect(await k.agent.inbox(nur)).toEqual([]);
+    expect(k.telegram.last(ANN_CHAT)?.text).toStartWith('⛔');
+  });
+
+  test('/sessions показывает только свои сессии; кнопка чужой сессии — отказ', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    await k.agent.notify(ann, 'y');
+    await k.say(NUR_CHAT, '/sessions');
+    const nurMenu = k.telegram.last(NUR_CHAT)!;
+    expect(nurMenu.text).not.toContain('site');
+
+    await k.press(ANN_CHAT, 1, nurMenu.buttons![0]![0]!.data);
+    expect(k.store.chatTarget(ANN_CHAT)).toBeUndefined();
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toStartWith('⛔');
+  });
+
+  test('неизвестная кнопка — подсказка', async () => {
+    const k = setup();
+    await k.press(NUR_CHAT, 1, 'zzz');
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('⚠️ кнопка устарела');
+  });
+});

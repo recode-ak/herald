@@ -4,9 +4,10 @@ import type { InboxItem } from '../domain/inbox.ts';
 import { type Choice, Question, type QuestionOption } from '../domain/question.ts';
 import { Session } from '../domain/session.ts';
 import { Messages } from './messages.ts';
+import { Notices } from './notices.ts';
 import { type Caller, type Clock, ForbiddenError, type Ids, NotFoundError } from './ports.ts';
 import type { Store } from './store.ts';
-import { TelegramError, type TelegramPort } from './telegram.ts';
+import type { TelegramPort } from './telegram.ts';
 
 export interface AgentDeps {
   store: Store;
@@ -24,7 +25,11 @@ export interface AskInput {
 
 /** Сценарии агента: уведомление, вопрос, решение, статус, входящие. Каждое обращение отмечает сессию активной. */
 export class AgentService {
-  constructor(private readonly deps: AgentDeps) {}
+  private readonly notices: Notices;
+
+  constructor(private readonly deps: AgentDeps) {
+    this.notices = new Notices(deps.store, deps.telegram);
+  }
 
   async notify(caller: Caller, text: string): Promise<void> {
     const body = text.trim();
@@ -62,7 +67,7 @@ export class AgentService {
     const question = this.ownQuestion(caller, questionId);
     question.decide(choice, reason, this.deps.clock.now());
     this.deps.store.saveQuestion(question);
-    await this.refreshQuestion(question, session);
+    await this.notices.refreshQuestion(question, session);
     return question;
   }
 
@@ -87,11 +92,7 @@ export class AgentService {
       for (const item of items) store.saveInboxItem(item);
       return items;
     });
-    for (const item of read) {
-      for (const link of store.linksOfInbox(item.id)) {
-        await this.bestEffort(this.deps.telegram.edit(link.chatId, link.messageId, Messages.inboxRead(session)));
-      }
-    }
+    for (const item of read) await this.notices.read(item, session);
     return read.map((i) => i.id);
   }
 
@@ -118,22 +119,5 @@ export class AgentService {
     if (!question) throw new NotFoundError(`вопроса ${questionId} нет`);
     if (question.person !== caller.person) throw new ForbiddenError(`вопрос ${questionId} — другого человека`);
     return question;
-  }
-
-  private async refreshQuestion(question: Question, session: Session): Promise<void> {
-    const text = Messages.question(question, session);
-    const buttons = Messages.questionButtons(question);
-    for (const link of this.deps.store.linksOfQuestion(question.id)) {
-      await this.bestEffort(this.deps.telegram.edit(link.chatId, link.messageId, text, buttons));
-    }
-  }
-
-  /** Отметки в Telegram не должны ломать сценарий: решение уже сохранено. */
-  private async bestEffort(operation: Promise<void>): Promise<void> {
-    try {
-      await operation;
-    } catch (error) {
-      if (!(error instanceof TelegramError)) throw error;
-    }
   }
 }

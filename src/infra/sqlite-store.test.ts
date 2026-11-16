@@ -138,6 +138,19 @@ describe('SqliteStore: offset Telegram и транзакции', () => {
   });
 });
 
+describe('SqliteStore: адресат чата', () => {
+  test('выбранная сессия чата сохраняется и сбрасывается', () => {
+    const store = SqliteStore.open(':memory:');
+    expect(store.chatTarget(111)).toBeUndefined();
+    store.setChatTarget(111, 'laptop:/a');
+    store.setChatTarget(222, 'pc:/b');
+    expect(store.chatTarget(111)).toBe('laptop:/a');
+    store.setChatTarget(111, undefined);
+    expect(store.chatTarget(111)).toBeUndefined();
+    expect(store.chatTarget(222)).toBe('pc:/b');
+  });
+});
+
 describe('SqliteStore: файл', () => {
   const dir = mkdtempSync(join(tmpdir(), 'herald-store-'));
   afterAll(() => rmSync(dir, { recursive: true, force: true }));

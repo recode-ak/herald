@@ -36,6 +36,10 @@ export interface Store {
   linksOfQuestion(questionId: string): MessageLink[];
   linksOfInbox(inboxId: string): MessageLink[];
 
+  /** Сессия, выбранная в `/sessions`: следующий текст чата — её указание. */
+  chatTarget(chatId: number): string | undefined;
+  setChatTarget(chatId: number, sessionKey: string | undefined): void;
+
   /** offset `getUpdates`: следующий ожидаемый update_id. */
   telegramOffset(): number;
   setTelegramOffset(offset: number): void;

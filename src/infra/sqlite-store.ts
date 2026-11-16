@@ -279,6 +279,16 @@ export class SqliteStore implements Store {
       .map(SqliteStore.toLink);
   }
 
+  chatTarget(chatId: number): string | undefined {
+    return this.db.query<{ value: string }, [string]>('SELECT value FROM kv WHERE key = ?').get(`target:${chatId}`)
+      ?.value;
+  }
+
+  setChatTarget(chatId: number, sessionKey: string | undefined): void {
+    if (sessionKey === undefined) this.db.query('DELETE FROM kv WHERE key = ?').run(`target:${chatId}`);
+    else this.db.query('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)').run(`target:${chatId}`, sessionKey);
+  }
+
   telegramOffset(): number {
     const row = this.db.query<{ value: string }, []>("SELECT value FROM kv WHERE key = 'telegram_offset'").get();
     return row ? Number(row.value) : 0;
