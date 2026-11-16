@@ -1,0 +1,5 @@
+Верификация Фазы 1 «Каркас и домен».
+Автоматически: bun run check — biome, tsc --noEmit, bun test: 42 pass, 0 fail.
+Покрытие: access, session, question, inbox — тесты рядом; errors.ts — только класс ошибки.
+Ручная проверка (Автопилот — считается пройденной): прочитать docs/model.md, сверить с src/domain; bun test src/domain.
+Критерии фазы: check зелёный — да; домен без ввода-вывода, покрыт тестами — да; docs/model.md описывает сущности и состояния — да.
