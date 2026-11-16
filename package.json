@@ -10,7 +10,8 @@
     "lint": "bunx biome check .",
     "typecheck": "bunx tsc --noEmit",
     "check": "bun run lint && bun run typecheck && bun test",
-    "link": "mkdir -p ~/.local/bin && ln -sf \"$PWD/src/cli/main.ts\" ~/.local/bin/herald && echo \"herald → ~/.local/bin/herald\""
+    "link": "mkdir -p ~/.local/bin && ln -sf \"$PWD/src/cli/main.ts\" ~/.local/bin/herald && echo \"herald → ~/.local/bin/herald\"",
+    "purge": "bun src/server/purge.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
