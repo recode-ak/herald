@@ -1,0 +1,1 @@
+Задачи 3–4 трека question-group: src/app/messages.ts (пункт N из M, кнопки b:/t:, итоги decidedRest, тексты входящих), notices.ts (sendItem, advance, refresh по пунктам), human.ts (ответ по пункту, toTerminal), agent.ts (ask/decide/answered с пачкой). Причина — spec п. 8–14. Кнопка «🖥 В терминал» добавлена и одиночным вопросам — обновлены ожидания кнопок в старых тестах.
