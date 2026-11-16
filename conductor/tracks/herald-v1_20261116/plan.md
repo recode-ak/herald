@@ -112,7 +112,11 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: КП 9 выполнен; финальный гейт зелёный; итог трека с принятыми стратегическими решениями.
 
-- [ ] Task: Клиент herald на рабочей машине (конфиг, `bun run link`, канал в Claude Code)
+- [x] Task: Клиент herald на рабочей машине (конфиг, `bun run link`, канал в Claude Code)
+    - [x] Конфиг `~/.config/herald/config.json` (600) — с Фазы 6; `bun run link` → `~/.local/bin/herald`, `herald status` — ok
+    - [x] `claude mcp add --scope user herald -- bun ~/dev/tools/herald/src/channel/main.ts` — ✔ Connected
+    - [ ] `permissions.allow` для `mcp__herald__*` — агенту запрещено править `~/.claude/settings.json`, за Нурболатом (по желанию)
+    - [ ] КП 6 — живая сессия `claude --dangerously-load-development-channels server:herald`, за Нурболатом
 - [ ] Task: Инструкция «Автопилот» в `~/.pi/agent/AGENTS.md` → herald (`ask`, `status` и `inbox` на границах задач, канал в Claude Code); память агента; удалить `~/.local/bin/agent-notify` и `agent-notify.env`
 - [ ] Task: Финальный гейт — `bun run check`, сравнение с базовой линией; `summary.md` трека: сделанное, решения (вопрос → варианты → выбранное → как переиграть), отложенное
 - [ ] Task: Conductor - User Manual Verification 'Фаза 7: Перевод Автопилота и итог' (Protocol in workflow.md)
