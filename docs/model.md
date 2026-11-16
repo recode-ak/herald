@@ -2,7 +2,7 @@
 
 Сущности, состояния и правила домена (`src/domain`). Домен синхронный, без ввода-вывода; время — мс эпохи, передаётся снаружи. Нарушение правила — `DomainError`, ошибка конфига доступа — `AccessConfigError`.
 
-Сценарии (`src/app`) — ниже, в разделах «Бот» и «Ожидание». HTTP API, команды CLI и инструменты канала — появятся в фазах 3–5 трека v1.
+Сценарии (`src/app`) — ниже, в разделах «Бот» и «Ожидание»; HTTP API и настройки сервера — в разделах «HTTP API» и «Сервер». Команды CLI и инструменты канала — появятся в фазах 4–5 трека v1.
 
 ## Доступ (`access.ts`)
 
@@ -83,3 +83,38 @@ Long poll без опроса базы: сценарии человека буд
 
 - `awaitQuestion` — до ответа или таймаута (тогда вопрос `open`). «Жди меня» ожидание не завершает. Ответ, полученный ожиданием, сразу подтверждается — во входящих не повторяется.
 - `awaitInbox` — непрочитанные сразу, иначе первые пришедшие; по таймауту — пусто.
+
+## HTTP API (`src/http`)
+
+`POST /v1/<действие>`, тело и ответ — JSON, заголовок `Authorization: Bearer <токен>` (токен → человек). Сессия вызывающего — поле `session: { host, root, name? }` в каждом теле; каждое обращение отмечает её активной.
+
+| Путь | Тело (кроме `session`) | Ответ |
+|---|---|---|
+| `/v1/notify` | `text` | `{ ok: true }` |
+| `/v1/ask` | `text`, `options?: [{ id, text }]`, `recommended?` | `{ question }` |
+| `/v1/question` | `id`, `waitMs?` | `{ question }` — после ответа или по истечении `waitMs` (тогда `status: open`) |
+| `/v1/decide` | `id`, `option` или `text`, `reason` | `{ question }` |
+| `/v1/status` | `text` | `{ ok: true }` |
+| `/v1/inbox` | `waitMs?` | `{ items }` — непрочитанные; пусто — ждёт первых до `waitMs` |
+| `/v1/ack` | `ids: string[]` | `{ read }` — id впервые прочитанных |
+| `GET /health` | — (без токена) | `{ ok: true }` |
+
+- `question`: `{ id, text, options, recommended?, status, askedAt, heldAt?, resolution?, lateAnswers }`; `item`: `{ id, kind, text, questionId?, option?, createdAt }` (типы — `src/http/wire.ts`, общие с клиентом).
+- `waitMs` урезается до `HERALD_MAX_WAIT_SECONDS`: ждать дольше клиент должен переподключением.
+- Ошибки — `{ error }`: 400 — неверный запрос или правило домена, 401 — токен, 403 — чужой вопрос или сессия, 404 — нет пути или объекта, 405 — не POST, 502 — сбой Telegram (`notify`/`ask` не доставлены), 500 — прочее (в лог).
+
+## Сервер (`src/server`)
+
+Запуск — `bun src/server/main.ts` из каталога с `.env` (Bun читает его сам). Ошибка конфига — код 1; SIGINT/SIGTERM — остановка опроса Telegram, обрыв long poll (клиенты переподключаются), закрытие базы, код 0.
+
+| Переменная | По умолчанию | Смысл |
+|---|---|---|
+| `HERALD_TOKENS`, `HERALD_PEOPLE` | — (обязательны) | доступ, см. «Доступ» |
+| `HERALD_BOT_TOKEN` | — (обязательна) | токен бота из BotFather |
+| `HERALD_PORT`, `HERALD_HOSTNAME` | `4518`, `127.0.0.1` | где слушать; наружу — через nginx |
+| `HERALD_DB` | `./data/herald.db` | SQLite (WAL); каталог создаётся |
+| `HERALD_ACTIVE_HOURS` | `24` | окно активности сессии для `/sessions` и `/status` |
+| `HERALD_MAX_WAIT_SECONDS` | `50` | потолок одного long poll (≤ 240; ниже `proxy_read_timeout` nginx — 60 с) |
+| `HERALD_TELEGRAM_API` | `https://api.telegram.org` | адрес Bot API (в тестах — фейк) |
+
+Telegram опрашивается long polling `getUpdates` (25 с); offset хранится в базе и переживает перезапуск. Сбой разбора апдейта пишется в лог, апдейт не повторяется. Bot API: сеть и 5xx — повтор с паузой, 429 — по `retry_after`, прочие 4xx — ошибка сразу.
