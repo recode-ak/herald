@@ -7,7 +7,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 Критерии фазы: `bun run check` зелёный; политика покрыта тестами хранилища; `bun run purge` работает на временной базе.
 
 - [x] Task: Срок хранения в домене — `Retention` (дни ≥ 1, `cutoff(now)`) (376bf2c)
-- [ ] Task: Миграция v5 — `message_links.created_at`
+- [x] Task: Миграция v5 — `message_links.created_at` (bc08fa1)
 - [ ] Task: `Store.purge(cutoff, { dryRun })` — правила политики, счётчики удалённого и оставшегося
 - [ ] Task: Команда `bun run purge` — аргументы, `HERALD_RETENTION_DAYS`, JSON, коды выхода
 - [ ] Task: Бот — кнопка на удалённом вопросе: «вопрос устарел и удалён»
