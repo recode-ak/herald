@@ -2,7 +2,7 @@
 
 Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.md).
 
-## Фаза 1: Домен, хранилище, сервер
+## Фаза 1: Домен, хранилище, сервер [checkpoint: badf558]
 
 Критерии фазы: `bun run check` зелёный; требования 1–17 покрыты тестами; старый одиночный `ask` работает без изменений.
 
@@ -11,7 +11,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Бот — пункты по очереди, «Вопрос N из M», ответ по пункту, `answer` по готовности пачки (5610755)
 - [x] Task: Бот — «Жди меня (вся пачка)», «🖥 В терминал», итог решения агента (5610755)
 - [x] Task: Агент и HTTP — `ask` с `questions`, `decide`/`answered` с `answers`, `POST /v1/to-terminal`, провод (40362c5)
-- [ ] Task: Conductor - User Manual Verification 'Фаза 1: Домен, хранилище, сервер' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 1: Домен, хранилище, сервер' (badf558) (Protocol in workflow.md)
 
 ## Фаза 2: Клиенты, документы и выкатка
 
