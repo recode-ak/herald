@@ -1,0 +1,1 @@
+Задача «Входящие». src/domain/inbox.ts: InboxItem (answer/late-answer — с questionId; directive), markRead один раз; Inbox (одна сессия): pending по времени и id, ack — атомарно, возвращает впервые прочитанные (для отметки «прочитано» в Telegram). check зелёный, 42 теста.
