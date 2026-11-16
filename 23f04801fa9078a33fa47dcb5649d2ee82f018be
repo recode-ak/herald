@@ -1,0 +1,1 @@
+Задача: кнопка на удалённом вопросе. src/app/human.ts — callback a:/h: по вопросу, которого нет в хранилище, отвечает Messages.QUESTION_GONE вместо «вопроса … нет». Тест в human.test.ts (вопрос удаляется store.purge).
