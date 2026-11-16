@@ -76,6 +76,9 @@ describe('HeraldClient', () => {
     await c.notify('Готово');
     expect(k.telegram.last(NUR_CHAT)?.text).toBe('[laptop · u7-school]\nГотово');
     await c.status('Фаза 4');
+    await c.title('ревью');
+    await c.notify('Ещё');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('[laptop · u7-school · ревью]\nЕщё');
     const q = await c.ask({ text: 'Какую БД?', options, recommended: 'A' });
     expect(q.status).toBe('open');
     const decided = await c.decide(q.id, { option: 'A' }, 'по таймауту');

@@ -53,7 +53,7 @@ describe('HeraldChannel — объявление', () => {
   test('инструменты: reply, notify, ask, decide, status', async () => {
     const { client } = await setup();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['ask', 'decide', 'notify', 'reply', 'status']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['ask', 'decide', 'notify', 'reply', 'status', 'title']);
     for (const t of tools) expect(t.description).toBeString();
   });
 });
@@ -64,6 +64,12 @@ describe('HeraldChannel — инструменты', () => {
     expect((await call('reply', { text: 'Готово' })).isError).toBe(false);
     await call('notify', { text: 'Фаза 5' });
     expect(herald.notified).toEqual(['Готово', 'Фаза 5']);
+  });
+
+  test('title — название сессии', async () => {
+    const { herald, call } = await setup();
+    await call('title', { text: 'dmg-ui · Ф4' });
+    expect(herald.titles).toEqual(['dmg-ui · Ф4']);
   });
 
   test('status', async () => {

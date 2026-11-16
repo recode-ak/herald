@@ -1,11 +1,15 @@
 import type { PersonId } from './access.ts';
 import { DomainError } from './errors.ts';
 
-/** Где работает агент: машина и корень git-репо, или явное имя сессии вместо корня. */
+/**
+ * Где работает агент: машина и корень git-репо, или явное имя сессии вместо корня.
+ * `instance` — окно агента в том же корне (параллельные сессии Claude Code); при явном имени не учитывается.
+ */
 export interface SessionRef {
   host: string;
   root: string;
   name?: string;
+  instance?: string;
 }
 
 export interface SessionStatus {
@@ -21,22 +25,27 @@ export interface SessionState {
   root: string;
   lastSeenAt: number;
   status?: SessionStatus;
+  /** Название от агента — что делает сессия; в шапке после проекта. */
+  title?: string;
 }
 
-/** Сессия агента. Ключ — `host:корень` или `host:@имя`; время — мс эпохи. */
+/** Сессия агента. Ключ — `host:корень`, `host:корень#окно` или `host:@имя`; время — мс эпохи. */
 export class Session {
   static readonly STATUS_MAX = 500;
+  static readonly TITLE_MAX = 60;
 
   private constructor(private readonly state: SessionState) {}
 
   static keyOf(ref: SessionRef): string {
-    const { host, root, name } = Session.normalize(ref);
-    return name ? `${host}:@${name}` : `${host}:${root}`;
+    const { host, root, name, instance } = Session.normalize(ref);
+    if (name) return `${host}:@${name}`;
+    return instance ? `${host}:${root}#${instance}` : `${host}:${root}`;
   }
 
   static open(ref: SessionRef & { person: PersonId }, now: number): Session {
-    const { host, root, name } = Session.normalize(ref);
-    const project = name ?? root.split('/').filter(Boolean).at(-1) ?? root;
+    const { host, root, name, instance } = Session.normalize(ref);
+    const base = root.split('/').filter(Boolean).at(-1) ?? root;
+    const project = name ?? (instance ? `${base}·${instance}` : base);
     return new Session({ key: Session.keyOf(ref), person: ref.person, host, project, root, lastSeenAt: now });
   }
 
@@ -62,6 +71,13 @@ export class Session {
   get status(): SessionStatus | undefined {
     return this.state.status;
   }
+  get title(): string | undefined {
+    return this.state.title;
+  }
+  /** Как сессию видит человек: проект и название, если есть. */
+  get label(): string {
+    return this.state.title ? `${this.state.project} · ${this.state.title}` : this.state.project;
+  }
 
   touch(now: number): void {
     this.state.lastSeenAt = now;
@@ -75,6 +91,14 @@ export class Session {
     this.touch(now);
   }
 
+  setTitle(text: string, now: number): void {
+    const trimmed = text.trim();
+    if (!trimmed) throw new DomainError('название сессии пусто');
+    if (trimmed.length > Session.TITLE_MAX) throw new DomainError(`название длиннее ${Session.TITLE_MAX} символов`);
+    this.state.title = trimmed;
+    this.touch(now);
+  }
+
   isActive(now: number, windowMs: number): boolean {
     return now - this.state.lastSeenAt <= windowMs;
   }
@@ -83,12 +107,14 @@ export class Session {
     return { ...this.state };
   }
 
-  private static normalize(ref: SessionRef): { host: string; root: string; name?: string } {
+  private static normalize(ref: SessionRef): { host: string; root: string; name?: string; instance?: string } {
     const host = ref.host.trim();
     const root = ref.root.trim().replace(/\/+$/, '') || ref.root.trim();
     const name = ref.name?.trim() || undefined;
+    const instance = ref.instance?.trim() || undefined;
     if (!host) throw new DomainError('host пуст');
     if (!root) throw new DomainError('корень сессии пуст');
-    return name ? { host, root, name } : { host, root };
+    if (name) return { host, root, name };
+    return instance ? { host, root, instance } : { host, root };
   }
 }

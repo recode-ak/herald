@@ -21,6 +21,28 @@ describe('Session', () => {
     expect(s.project).toBe('ревью');
   });
 
+  test('окно агента (instance) — свой ключ и метка в проекте; явное имя главнее', () => {
+    const s = Session.open({ person: 'nur', host: 'laptop', root: '/home/nur/u7-school', instance: '02dc' }, t0);
+    expect(s.key).toBe('laptop:/home/nur/u7-school#02dc');
+    expect(s.project).toBe('u7-school·02dc');
+    expect(s.label).toBe('u7-school·02dc');
+    const named = Session.open({ person: 'nur', host: 'laptop', root: '/x', name: 'ревью', instance: '02dc' }, t0);
+    expect(named.key).toBe('laptop:@ревью');
+    expect(Session.keyOf({ host: 'laptop', root: '/x', instance: ' ' })).toBe('laptop:/x');
+  });
+
+  test('название от агента: в метке после проекта; пустое или длинное — ошибка; это обращение', () => {
+    const s = Session.open({ person: 'nur', host: 'h', root: '/x/u7-school' }, t0);
+    expect(s.title).toBeUndefined();
+    expect(s.label).toBe('u7-school');
+    s.setTitle('  dmg-ui · Ф4  ', t0 + 5);
+    expect(s.title).toBe('dmg-ui · Ф4');
+    expect(s.label).toBe('u7-school · dmg-ui · Ф4');
+    expect(s.lastSeenAt).toBe(t0 + 5);
+    expect(() => s.setTitle(' ', t0)).toThrow(DomainError);
+    expect(() => s.setTitle('x'.repeat(Session.TITLE_MAX + 1), t0)).toThrow(DomainError);
+  });
+
   test('ключ без открытия сессии совпадает с ключом открытой', () => {
     const ref = { host: 'srv', root: '/srv/app/' };
     expect(Session.keyOf(ref)).toBe(Session.open({ person: 'nur', ...ref }, t0).key);
@@ -60,6 +82,7 @@ describe('Session', () => {
   test('состояние сохраняется и восстанавливается', () => {
     const s = Session.open({ person: 'nur', host: 'h', root: '/x' }, t0);
     s.setStatus('идёт', t0 + 1);
+    s.setTitle('ревью', t0 + 2);
     const back = Session.restore(s.toState());
     expect(back.toState()).toEqual(s.toState());
   });

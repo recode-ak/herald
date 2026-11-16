@@ -7,6 +7,7 @@ import type { ChannelHerald } from './channel.ts';
 export class FakeHerald implements ChannelHerald {
   readonly notified: string[] = [];
   readonly statuses: string[] = [];
+  readonly titles: string[] = [];
   readonly asked: AskRequest[] = [];
   readonly decided: { id: string; choice: Choice; reason: string }[] = [];
   readonly acked: string[] = [];
@@ -35,6 +36,11 @@ export class FakeHerald implements ChannelHerald {
   async status(text: string): Promise<void> {
     this.maybeFail();
     this.statuses.push(text);
+  }
+
+  async title(text: string): Promise<void> {
+    this.maybeFail();
+    this.titles.push(text);
   }
 
   async ask(request: AskRequest): Promise<QuestionWire> {

@@ -9,6 +9,7 @@ import type { InboxItemWire, QuestionWire } from '../http/wire.ts';
 export interface ChannelHerald {
   notify(text: string): Promise<void>;
   status(text: string): Promise<void>;
+  title(text: string): Promise<void>;
   ask(request: AskRequest): Promise<QuestionWire>;
   decide(id: string, choice: Choice, reason: string): Promise<QuestionWire>;
   inbox(waitMs?: number): Promise<InboxItemWire[]>;
@@ -53,6 +54,8 @@ const INSTRUCTIONS = [
   '- kind="late-answer" question_id="..." — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
   '',
   'ask задаёт вопрос с вариантами и сразу возвращает id — не жди, продолжай работу; ответ придёт событием. Если ответа долго нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). status — короткий статус сессии на границах задач (в Telegram не отправляется, человек видит его по /status).',
+  '',
+  'title — название сессии в шапке её сообщений (например, «dmg-ui · Ф4»): по нему человек отличает параллельные окна одного проекта. Задай его в начале работы и обнови, когда сессия переходит к другой задаче.',
 ].join('\n');
 
 const TOOLS = [
@@ -106,6 +109,12 @@ const TOOLS = [
   {
     name: 'status',
     description: 'Обновить статус сессии (что делаю сейчас). В Telegram не отправляется; человек видит его по /status.',
+    inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+  },
+  {
+    name: 'title',
+    description:
+      'Назвать сессию (≤ 60 символов): название идёт в шапку её сообщений в Telegram — так человек отличает параллельные окна одного проекта.',
     inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
   },
 ];
@@ -248,6 +257,9 @@ export class HeraldChannel {
         case 'status':
           await this.herald.status(HeraldChannel.string(args, 'text'));
           return HeraldChannel.ok('статус обновлён');
+        case 'title':
+          await this.herald.title(HeraldChannel.string(args, 'text'));
+          return HeraldChannel.ok('название сессии обновлено');
         case 'ask': {
           const recommended = HeraldChannel.optionalString(args, 'recommended');
           const question = await this.herald.ask({

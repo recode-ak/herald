@@ -202,6 +202,15 @@ describe('Статус и входящие', () => {
     expect(k.telegram.sentTo(NUR_CHAT)).toEqual([]);
   });
 
+  test('title: название сессии; instance в session — отдельная сессия', async () => {
+    const k = setup();
+    const window = { ...session, instance: '02dc' };
+    expect(await k.call('/v1/title', { session: window, text: 'ревью' })).toEqual({ status: 200, json: { ok: true } });
+    await k.call('/v1/notify', { session: window, text: 'x' });
+    expect(k.telegram.last(NUR_CHAT)?.text).toEndWith('·02dc · ревью]\nx');
+    expect((await k.call('/v1/title', { session, text: ' ' })).status).toBe(400);
+  });
+
   test('inbox: указание приходит в ждущий запрос; ack отмечает прочитанным', async () => {
     const k = setup();
     await k.call('/v1/notify', { session, text: 'Готово' });

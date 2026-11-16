@@ -1,3 +1,4 @@
+import { Database } from 'bun:sqlite';
 import { afterAll, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -38,9 +39,30 @@ describe('SqliteStore: сессии', () => {
     expect(store.session(s.key)?.toState()).toEqual(s.toState());
 
     s.setStatus('Фаза 2', 200);
+    s.setTitle('ревью', 210);
     store.saveSession(s);
     expect(store.session(s.key)?.toState()).toEqual(s.toState());
     expect(store.session('нет')).toBeUndefined();
+  });
+
+  test('миграция v1 → v2: сессии сохраняются, название пишется', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'herald-mig-'));
+    const path = join(dir, 'v1.db');
+    const v1 = new Database(path, { create: true });
+    v1.run(`CREATE TABLE sessions (key TEXT PRIMARY KEY, person TEXT NOT NULL, host TEXT NOT NULL,
+      project TEXT NOT NULL, root TEXT NOT NULL, last_seen_at INTEGER NOT NULL, status_text TEXT, status_at INTEGER)`);
+    v1.run(`INSERT INTO sessions VALUES ('laptop:/x', 'nur', 'laptop', 'x', '/x', 100, NULL, NULL)`);
+    v1.run('PRAGMA user_version = 1');
+    v1.close();
+
+    const store = SqliteStore.open(path);
+    const s = store.session('laptop:/x')!;
+    expect(s.title).toBeUndefined();
+    s.setTitle('ревью', 200);
+    store.saveSession(s);
+    expect(store.session('laptop:/x')?.title).toBe('ревью');
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
   });
 
   test('сессии человека — недавние первыми, чужие не попадают', () => {

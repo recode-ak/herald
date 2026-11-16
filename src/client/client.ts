@@ -52,6 +52,10 @@ export class HeraldClient {
     await this.call('/v1/status', { text });
   }
 
+  async title(text: string): Promise<void> {
+    await this.call('/v1/title', { text });
+  }
+
   async ask(request: AskRequest): Promise<QuestionWire> {
     return ((await this.call('/v1/ask', { ...request })) as { question: QuestionWire }).question;
   }

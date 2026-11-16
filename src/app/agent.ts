@@ -80,6 +80,13 @@ export class AgentService {
     this.deps.store.saveSession(session);
   }
 
+  /** Название сессии — в шапке её сообщений. В Telegram отдельно не отправляется. */
+  async title(caller: Caller, text: string): Promise<void> {
+    const session = this.enter(caller);
+    session.setTitle(text, this.deps.clock.now());
+    this.deps.store.saveSession(session);
+  }
+
   async inbox(caller: Caller): Promise<InboxItem[]> {
     const session = this.enter(caller);
     return this.deps.store.inbox(session.key).pending();

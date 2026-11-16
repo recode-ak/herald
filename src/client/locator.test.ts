@@ -35,4 +35,17 @@ describe('SessionLocator', () => {
     expect(locator.locate({ cwd: dir, name: 'ночь' })).toEqual({ host: 'laptop', root: dir, name: 'ночь' });
     expect(locator.locate({ cwd: dir, name: ' ' })).toEqual({ host: 'laptop', root: dir });
   });
+
+  test('сессия Claude Code (CLAUDE_CODE_SESSION_ID) — окно: первые 4 символа; явное имя главнее', () => {
+    const dir = tempDir();
+    const locator = new SessionLocator('laptop');
+    const agentSession = '02dcbdb9-11eb-4ebb-a9f9-48d9cc4d2656';
+    expect(locator.locate({ cwd: dir, agentSession })).toEqual({ host: 'laptop', root: dir, instance: '02dc' });
+    expect(locator.locate({ cwd: dir, name: 'ночь', agentSession })).toEqual({
+      host: 'laptop',
+      root: dir,
+      name: 'ночь',
+    });
+    expect(locator.locate({ cwd: dir, agentSession: ' ' })).toEqual({ host: 'laptop', root: dir });
+  });
 });

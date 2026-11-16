@@ -8,7 +8,7 @@ export class Messages {
   static readonly CALLBACK_MAX_BYTES = 64;
 
   static header(session: Session): string {
-    return `[${session.host} · ${session.project}]`;
+    return `[${session.host} · ${session.label}]`;
   }
 
   static notify(session: Session, text: string): string {
@@ -54,7 +54,7 @@ export class Messages {
   /** Строка `/sessions`: давность активности и последний статус. */
   static sessionLine(session: Session, now: number): string {
     const status = session.status ? ` — ${session.status.text} (${Messages.ago(session.status.at, now)})` : '';
-    return `• ${session.host} · ${session.project} — ${Messages.ago(session.lastSeenAt, now)}${status}`;
+    return `• ${session.host} · ${session.label} — ${Messages.ago(session.lastSeenAt, now)}${status}`;
   }
 
   /** Строка `/status`: последний статус с давностью. */
@@ -62,11 +62,11 @@ export class Messages {
     const status = session.status
       ? `${session.status.text} (${Messages.ago(session.status.at, now)})`
       : `статуса нет (${Messages.ago(session.lastSeenAt, now)})`;
-    return `• ${session.host} · ${session.project} — ${status}`;
+    return `• ${session.host} · ${session.label} — ${status}`;
   }
 
   static sessionButton(session: Session): string {
-    return `${session.project} · ${session.host}`;
+    return `${session.label} · ${session.host}`;
   }
 
   static readonly NO_SESSIONS = 'Активных сессий нет.';

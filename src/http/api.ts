@@ -63,6 +63,7 @@ export class HttpApi {
         }),
       ],
       ['/v1/status', (c, b) => agent.status(c, b.string('text'))],
+      ['/v1/title', (c, b) => agent.title(c, b.string('text'))],
       ['/v1/inbox', async (c, b) => ({ items: (await agent.awaitInbox(c, this.wait(b))).map(Wire.inboxItem) })],
       ['/v1/ack', async (c, b) => ({ read: await agent.ack(c, b.strings('ids')) })],
     ]);

@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { HeraldClient } from '../client/client.ts';
 import { ClientConfig } from '../client/config.ts';
 import { SessionLocator } from '../client/locator.ts';
+import { Session } from '../domain/session.ts';
 import { SystemClock } from '../infra/system.ts';
 import { HeraldChannel } from './channel.ts';
 
@@ -17,7 +18,11 @@ try {
   process.exit(1);
 }
 
-const session = new SessionLocator(config.host).locate({ cwd: process.cwd(), name: process.env.HERALD_SESSION });
+const session = new SessionLocator(config.host).locate({
+  cwd: process.cwd(),
+  name: process.env.HERALD_SESSION,
+  agentSession: process.env.CLAUDE_CODE_SESSION_ID,
+});
 const herald = new HeraldClient({
   serverUrl: config.serverUrl,
   token: config.token,
@@ -28,4 +33,4 @@ const channel = new HeraldChannel({ herald, log, permissionRelay: process.env.HE
 channel.onclose = () => process.exit(0);
 await channel.connect(new StdioServerTransport());
 channel.start();
-log(`herald channel: сессия ${session.host}:${session.name ? `@${session.name}` : session.root} → ${config.serverUrl}`);
+log(`herald channel: сессия ${Session.keyOf(session)} → ${config.serverUrl}`);

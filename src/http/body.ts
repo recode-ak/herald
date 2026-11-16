@@ -63,11 +63,18 @@ export class RequestBody {
 
   session(name = 'session'): SessionRef {
     const value = this.data[name];
-    if (!RequestBody.isObject(value)) throw new BadRequestError(`поле «${name}» — ожидается { host, root, name? }`);
+    if (!RequestBody.isObject(value)) {
+      throw new BadRequestError(`поле «${name}» — ожидается { host, root, name?, instance? }`);
+    }
     const inner = new RequestBody(value);
     const ref: SessionRef = { host: inner.string('host'), root: inner.string('root') };
     const sessionName = inner.optionalString('name');
-    return sessionName === undefined ? ref : { ...ref, name: sessionName };
+    const instance = inner.optionalString('instance');
+    return {
+      ...ref,
+      ...(sessionName !== undefined && { name: sessionName }),
+      ...(instance !== undefined && { instance }),
+    };
   }
 
   private static isObject(value: unknown): value is Record<string, unknown> {

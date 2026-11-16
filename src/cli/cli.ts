@@ -28,6 +28,7 @@ const USAGE = `herald — вопросы и уведомления челове�
 
   herald notify <текст>                         уведомление
   herald status <текст>                         статус сессии (в Telegram не отправляется)
+  herald title <текст>                          название сессии — в шапке её сообщений
   herald ask <вопрос> [-o "A: текст"]… [--recommended A] [--timeout <с>]
                                                 вопрос; ждёт ответа (без --timeout — бесконечно)
   herald decide <id> (<вариант> | --text <текст>) --reason <причина>
@@ -58,6 +59,8 @@ export class Cli {
           return await this.notify(rest);
         case 'status':
           return await this.status(rest);
+        case 'title':
+          return await this.title(rest);
         case 'ask':
           return await this.ask(rest);
         case 'decide':
@@ -91,6 +94,12 @@ export class Cli {
   private async status(argv: readonly string[]): Promise<number> {
     const args = this.parse(argv, {});
     await this.client(args).status(Cli.text(args, 'текст статуса'));
+    return this.print({ ok: true });
+  }
+
+  private async title(argv: readonly string[]): Promise<number> {
+    const args = this.parse(argv, {});
+    await this.client(args).title(Cli.text(args, 'название сессии'));
     return this.print({ ok: true });
   }
 
@@ -151,6 +160,7 @@ export class Cli {
     const session = new SessionLocator(config.host).locate({
       cwd: this.deps.cwd,
       name: args.value('session') ?? this.deps.env.HERALD_SESSION,
+      agentSession: this.deps.env.CLAUDE_CODE_SESSION_ID,
     });
     return new HeraldClient({ serverUrl: config.serverUrl, token: config.token, session, clock: this.deps.clock });
   }

@@ -154,6 +154,17 @@ describe('AgentService.status', () => {
   });
 });
 
+describe('AgentService.title', () => {
+  test('название сессии — в шапке следующих сообщений', async () => {
+    const { agent, telegram, store } = setup();
+    await agent.title(nur, 'dmg-ui · Ф4');
+    expect(store.session(nurKey)?.title).toBe('dmg-ui · Ф4');
+    expect(telegram.sentTo(NUR_CHAT)).toEqual([]);
+    await agent.notify(nur, 'Готово');
+    expect(telegram.last(NUR_CHAT)?.text).toBe('[laptop · u7-school · dmg-ui · Ф4]\nГотово');
+  });
+});
+
 describe('AgentService.inbox и ack', () => {
   function directive(kit: ReturnType<typeof setup>, id: string, text: string) {
     kit.store.saveInboxItem(

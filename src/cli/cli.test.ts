@@ -106,6 +106,15 @@ describe('herald notify / status', () => {
     expect(k.telegram.last(NUR_CHAT)?.text).toBe('[laptop · день]\ny');
   });
 
+  test('title — название сессии в шапке; CLAUDE_CODE_SESSION_ID — окно сессии', async () => {
+    const k = setup();
+    const env = { CLAUDE_CODE_SESSION_ID: '02dcbdb9-11eb' };
+    expect((await k.run(['title', 'ревью', 'Ф4'], env)).json).toEqual({ ok: true });
+    await k.run(['notify', 'x'], env);
+    const project = k.cwd.split('/').at(-1);
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe(`[laptop · ${project}·02dc · ревью Ф4]\nx`);
+  });
+
   test('status — без отправки в Telegram', async () => {
     const k = setup();
     expect((await k.run(['status', 'Фаза 4: CLI'])).code).toBe(0);

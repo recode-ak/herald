@@ -21,8 +21,9 @@
 
 | Поле | Смысл |
 |---|---|
-| `key` | `host:корень` (корень git без хвостового `/`) или `host:@имя` при явном `--session` |
-| `project` | имя корня (`u7-school`) или имя сессии |
+| `key` | `host:корень` (корень git без хвостового `/`), `host:корень#окно` у сессии Claude Code или `host:@имя` при явном `--session` (оно главнее окна) |
+| `project` | имя корня (`u7-school`), с окном — `u7-school·02dc`, или имя сессии |
+| `title` | название от агента (≤ 60 символов, `title`); метка в шапке — `проект · название` |
 | `lastSeenAt` | последнее обращение агента; сессия активна, пока `now − lastSeenAt ≤ окно` |
 | `status` | `{ text, at }` — последний статус от агента, ≤ 500 символов; в Telegram сам не отправляется |
 
@@ -86,7 +87,7 @@ Long poll без опроса базы: сценарии человека буд
 
 ## HTTP API (`src/http`)
 
-`POST /v1/<действие>`, тело и ответ — JSON, заголовок `Authorization: Bearer <токен>` (токен → человек). Сессия вызывающего — поле `session: { host, root, name? }` в каждом теле; каждое обращение отмечает её активной.
+`POST /v1/<действие>`, тело и ответ — JSON, заголовок `Authorization: Bearer <токен>` (токен → человек). Сессия вызывающего — поле `session: { host, root, name?, instance? }` в каждом теле; каждое обращение отмечает её активной.
 
 | Путь | Тело (кроме `session`) | Ответ |
 |---|---|---|
@@ -95,6 +96,7 @@ Long poll без опроса базы: сценарии человека буд
 | `/v1/question` | `id`, `waitMs?` | `{ question }` — после ответа или по истечении `waitMs` (тогда `status: open`) |
 | `/v1/decide` | `id`, `option` или `text`, `reason` | `{ question }` |
 | `/v1/status` | `text` | `{ ok: true }` |
+| `/v1/title` | `text` | `{ ok: true }` — название сессии |
 | `/v1/inbox` | `waitMs?` | `{ items }` — непрочитанные; пусто — ждёт первых до `waitMs` |
 | `/v1/ack` | `ids: string[]` | `{ read }` — id впервые прочитанных |
 | `GET /health` | — (без токена) | `{ ok: true }` |
@@ -123,12 +125,13 @@ Telegram опрашивается long polling `getUpdates` (25 с); offset хр
 
 `herald` — тонкий слой над HTTP API для pi и любого агента с shell. Ставится `bun run link` → `~/.local/bin/herald`.
 
-Настройки — `~/.config/herald/config.json` `{ serverUrl, token, host }`; `HERALD_URL`, `HERALD_TOKEN`, `HERALD_HOST` важнее файла, `HERALD_CONFIG` — другой путь. `host` по умолчанию — имя машины. Сессия: корень git текущего каталога (вне git — сам каталог) или явное имя `--session <имя>` / `HERALD_SESSION`.
+Настройки — `~/.config/herald/config.json` `{ serverUrl, token, host }`; `HERALD_URL`, `HERALD_TOKEN`, `HERALD_HOST` важнее файла, `HERALD_CONFIG` — другой путь. `host` по умолчанию — имя машины. Сессия: корень git текущего каталога (вне git — сам каталог) или явное имя `--session <имя>` / `HERALD_SESSION`. Внутри Claude Code (`CLAUDE_CODE_SESSION_ID`) к корню добавляется окно — первые 4 символа id сессии: параллельные окна одного проекта не делят ящик; `--resume` сохраняет окно. Id берётся при запуске процесса: канал после `/clear` остаётся в прежнем окне.
 
 | Команда | Вывод (JSON в stdout) |
 |---|---|
 | `herald notify <текст>` | `{ ok: true }` |
 | `herald status <текст>` | `{ ok: true }` — в Telegram не отправляется |
+| `herald title <текст>` | `{ ok: true }` — название сессии в шапке |
 | `herald ask <вопрос> [-o "A: текст"]… [--recommended A] [--timeout <с>]` | `{ id, status, by?, option?, text?, reason? }`; без `--timeout` ждёт бесконечно |
 | `herald decide <id> (<вариант> \| --text <текст>) --reason <причина>` | то же, `status: decided` |
 | `herald inbox [--wait <с>] [--ack]` | `[{ id, kind, text, questionId?, option?, createdAt }]`; `--ack` — сразу подтвердить выданное |
@@ -148,6 +151,7 @@ MCP-сервер по stdio для Claude Code — тонкий слой над 
 | `ask` | `text`, `options?: [{ id, text }]`, `recommended?` | сразу id вопроса; ответ — событием |
 | `decide` | `question_id`, `option` или `text`, `reason` | решение агента |
 | `status` | `text` | статус сессии (в Telegram не отправляется) |
+| `title` | `text` | название сессии в шапке; инструкция канала просит задать его в начале работы |
 
 Входящие: цикл long poll `inbox` → `notifications/claude/channel` `{ content, meta }` → `ack` (подтверждение прочтения — после доставки; сбой — повтор, событие может прийти дважды).
 
