@@ -79,10 +79,10 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Сервер канала (stdio) (cd607f7)
     - [x] Тесты (фейковый клиент herald, транспорт MCP в памяти): capability, инструменты `reply`/`notify`, `ask` (сразу id), `decide`, `status`; цикл входящих → `notifications/claude/channel` с `meta` (вид, id вопроса) → подтверждение прочтения
     - [x] Реализация `src/channel`
-- [~] Task: Подтверждение действий из Telegram
-    - [ ] Тесты: `permission_request` → вопрос «разрешить / запретить» → `notifications/claude/channel/permission`; выключено по умолчанию
-    - [ ] Реализация
-- [ ] Task: `docs/install.md` — подключение канала (`.mcp.json`, флаг запуска, ограничения research preview)
+- [x] Task: Подтверждение действий из Telegram (df7b0d1)
+    - [x] Тесты: `permission_request` → вопрос «разрешить / запретить» → `notifications/claude/channel/permission`; выключено по умолчанию
+    - [x] Реализация
+- [~] Task: `docs/install.md` — подключение канала (`.mcp.json`, флаг запуска, ограничения research preview)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 5: Channel для Claude Code' (Protocol in workflow.md)
 
 ## Фаза 6: Деплой и установка
