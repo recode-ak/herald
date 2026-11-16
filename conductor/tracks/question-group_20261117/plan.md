@@ -8,8 +8,8 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 - [x] Task: Домен — `Question` как пачка пунктов: ответ по пункту, `decide` по неотвеченным, `moveToTerminal`, `answerInTerminal`; вид входящих `to-terminal` (0fd9793)
 - [x] Task: Хранилище — миграция v6 (`items`, `terminal_at`, `message_links.item`), чтение старых строк (0fd9793)
-- [ ] Task: Бот — пункты по очереди, «Вопрос N из M», ответ по пункту, `answer` по готовности пачки
-- [ ] Task: Бот — «Жди меня (вся пачка)», «🖥 В терминал», итог решения агента
+- [x] Task: Бот — пункты по очереди, «Вопрос N из M», ответ по пункту, `answer` по готовности пачки (5610755)
+- [x] Task: Бот — «Жди меня (вся пачка)», «🖥 В терминал», итог решения агента (5610755)
 - [ ] Task: Агент и HTTP — `ask` с `questions`, `decide`/`answered` с `answers`, `POST /v1/to-terminal`, провод
 - [ ] Task: Conductor - User Manual Verification 'Фаза 1: Домен, хранилище, сервер' (Protocol in workflow.md)
 
