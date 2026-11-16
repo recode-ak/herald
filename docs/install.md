@@ -88,3 +88,12 @@ claude --dangerously-load-development-channels server:herald
 - Событие приходит на ближайшем шаге агента; если сессия простаивает, оно ждёт следующего хода. Запасной путь — `herald inbox`.
 - Вопросы-подтверждения живут в процессе канала: после перезапуска Claude Code ответ на старый запрос придёт обычным событием `answer`.
 - Логи канала — только в stderr (stdout занят MCP).
+
+## Расширение для pi
+
+Пакет `integrations/pi`: на время сессии pi сообщения из Telegram (указания, поздние ответы) приходят в сессию сами, `/clear` и `/compact` из Telegram выполняются, сессия видна в `/sessions`, пока pi открыт. Настройки — те же, что у CLI; CLI в bash этой сессии pi пишет в тот же ящик (`PI_SESSION_ID`). Подробности — `docs/model.md` «Расширение pi».
+
+В `~/.pi/agent/settings.json` → `packages` добавить путь к `<herald>/integrations/pi` (абсолютный или относительно `~/.pi/agent`, например `../../dev/tools/herald/integrations/pi`), затем перезапустить pi или `/reload`. Зависимостей пакет не ставит: код — `src/pi` репо herald.
+
+- Ответ на вопрос расширение не берёт — его ждёт `herald ask`; вопрос без ожидания — забрать `herald inbox`.
+- `HERALD_SESSION` в окружении pi — явное имя сессии, как у CLI.
