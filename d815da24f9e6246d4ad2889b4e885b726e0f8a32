@@ -1,0 +1,3 @@
+Проверка Фазы 2 (server-ops и выкатка), режим Автопилот; выкатку и push разрешил Нурболат (herald q_bf6paofnnj, вариант A).
+herald: scripts/deploy.sh на kalki-server — /health ок, PRAGMA user_version = 5; bun src/server/purge.ts --dry-run → 0 к удалению, код 0.
+server-ops 2d674fb: deploy.sh --only herald-retention (cron 30 3 * * *); прогон под env -i (как cron) — код 0, status.json ok; health-check.sh --check 40-statusfiles → OK herald-retention; HERALD_DIR=/nonexistent --dry-run → код 1, причина в stderr.
