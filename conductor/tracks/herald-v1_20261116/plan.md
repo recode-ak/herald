@@ -28,9 +28,9 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: все сценарии spec (ФТ 1–8, 10) работают на SQLite в памяти и фейковом Telegram; доступ по человеку проверен тестами.
 
-- [ ] Task: SQLite-хранилище
-    - [ ] Тесты (`:memory:`): сессии, вопросы, входящие, связь `message_id → сессия/вопрос`, offset Telegram; схема создаётся при старте, WAL
-    - [ ] Реализация `src/infra/sqlite`
+- [x] Task: SQLite-хранилище (05b7465)
+    - [x] Тесты (`:memory:`): сессии, вопросы, входящие, связь `message_id → сессия/вопрос`, offset Telegram; схема создаётся при старте, WAL
+    - [x] Реализация `src/infra/sqlite`
 - [ ] Task: Порт Telegram и фейк
     - [ ] Интерфейс `TelegramPort` (отправить с кнопками, изменить, ответить на callback) и `FakeTelegram` для тестов
 - [ ] Task: Сценарии агента — `notify`, `ask`, `decide`, `status`, `inbox` (выдача и подтверждение прочтения)
