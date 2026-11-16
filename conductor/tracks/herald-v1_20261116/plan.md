@@ -61,10 +61,10 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: CLI-сценарии КП 1–5, 7 проходят сквозным тестом CLI → сервер → фейковый Telegram; `bun run link` ставит `herald`.
 
-- [ ] Task: Клиент herald (общий для CLI и канала)
-    - [ ] Тесты: конфиг `~/.config/herald/config.json` (и переопределение через env), ключ сессии (host, корень git, `--session`), переподключение long poll до таймаута
-    - [ ] Реализация `src/client`
-- [ ] Task: Команды `notify`, `ask`, `decide`, `status`, `inbox`
+- [x] Task: Клиент herald (общий для CLI и канала) (d3d3acf)
+    - [x] Тесты: конфиг `~/.config/herald/config.json` (и переопределение через env), ключ сессии (host, корень git, `--session`), переподключение long poll до таймаута
+    - [x] Реализация `src/client`
+- [~] Task: Команды `notify`, `ask`, `decide`, `status`, `inbox`
     - [ ] Тесты: аргументы, JSON-вывод, коды выхода (ответ / таймаут / ошибка), `ask` без `--timeout` ждёт бесконечно
     - [ ] Реализация `src/cli`, `bun run link`
 - [ ] Task: Сквозной тест `test/e2e/` — КП 1–5, 7 для CLI
