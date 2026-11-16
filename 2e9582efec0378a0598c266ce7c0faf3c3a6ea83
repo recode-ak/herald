@@ -1,0 +1,4 @@
+Задачи: «Каркас и базовая линия», «Доступ — люди и токены».
+Каркас: package.json (test/lint/typecheck/check/link), tsconfig strict, biome, LICENSE MIT-0 — по образцу chronicle.
+Базовая линия: на пустом наборе tsc падает (TS18003: нет входов) — линия зафиксирована с первым модулем: bun run check зелёный, 8 тестов, 0 fail.
+Доступ: src/domain/access.ts — Access.parse(HERALD_TOKENS, HERALD_PEOPLE), personByToken, personByChatId, chatIdOf; ошибки конфига — AccessConfigError.
