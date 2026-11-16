@@ -2,7 +2,7 @@
 
 Сущности, состояния и правила домена (`src/domain`). Домен синхронный, без ввода-вывода; время — мс эпохи, передаётся снаружи. Нарушение правила — `DomainError`, ошибка конфига доступа — `AccessConfigError`.
 
-Сценарии (`src/app`) — ниже, в разделах «Бот» и «Ожидание»; HTTP API и настройки сервера — в разделах «HTTP API» и «Сервер». Клиент и команды CLI — в разделе «CLI»; инструменты канала появятся в фазе 5 трека v1.
+Сценарии (`src/app`) — ниже, в разделах «Бот» и «Ожидание»; HTTP API и настройки сервера — в разделах «HTTP API» и «Сервер». Клиент и команды CLI — в разделе «CLI», инструменты и события канала Claude Code — в разделе «Канал».
 
 ## Доступ (`access.ts`)
 
@@ -137,3 +137,24 @@ Telegram опрашивается long polling `getUpdates` (25 с); offset хр
 - `ask`: `status` — `answered` (ответ человека), `decided` (решение агента), `timeout` (нет ответа); `text` у варианта — его текст.
 - Коды выхода: `0` — готово, `2` — `ask` без ответа по таймауту, `1` — ошибка (аргументы, настройки, отказ сервера; текст — в stderr).
 - Ожидание (`ask`, `inbox --wait`) — long poll кусками до своего таймаута: сбои сети и 5xx пережидаются, прочие ошибки — сразу.
+
+## Канал (`src/channel`)
+
+MCP-сервер по stdio для Claude Code — тонкий слой над тем же клиентом, что у CLI. Capability `experimental: { 'claude/channel': {} }` (и `'claude/channel/permission'` при `HERALD_PERMISSION_RELAY=1`). Подключение — `docs/install.md`.
+
+| Инструмент | Аргументы | Результат |
+|---|---|---|
+| `reply`, `notify` | `text` | уведомление человеку |
+| `ask` | `text`, `options?: [{ id, text }]`, `recommended?` | сразу id вопроса; ответ — событием |
+| `decide` | `question_id`, `option` или `text`, `reason` | решение агента |
+| `status` | `text` | статус сессии (в Telegram не отправляется) |
+
+Входящие: цикл long poll `inbox` → `notifications/claude/channel` `{ content, meta }` → `ack` (подтверждение прочтения — после доставки; сбой — повтор, событие может прийти дважды).
+
+| `meta.kind` | `content` | прочие `meta` |
+|---|---|---|
+| `directive` | текст указания | `item_id` |
+| `answer` | «Ответ на вопрос <id>: …» | `item_id`, `question_id`, `option?` |
+| `late-answer` | «Переигрывание вопроса <id>: …» | `item_id`, `question_id`, `option?` |
+
+Подтверждение действий: `notifications/claude/channel/permission_request` `{ request_id, tool_name, description, input_preview }` → вопрос «🔐 Разрешить <tool>?» с вариантами `allow`/`deny` → ответ человека → `notifications/claude/channel/permission` `{ request_id, behavior }`. «Разрешить» — `allow`, «Запретить» и свободный текст — `deny`; поздний ответ отбрасывается; событием в сессию не идёт.

@@ -6,4 +6,4 @@
 - **CLI `herald`** — для любого агента с shell (pi и др.): `notify`, `ask`, `decide`, `status`, `inbox`.
 - **Channel для Claude Code** — сообщения из Telegram приходят прямо в сессию.
 
-Установка — `docs/install.md` (появится в треке v1). Лицензия — MIT-0.
+Установка клиента и канала — `docs/install.md`. Лицензия — MIT-0.
