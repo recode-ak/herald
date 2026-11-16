@@ -1,0 +1,11 @@
+Отчёт о верификации — Фаза 3: HTTP-сервер и Telegram-адаптер.
+Автотесты: CI=true bun run check — biome, tsc --noEmit, 180 pass / 0 fail. Добавлены модульные тесты для файлов фазы без своих тестов: src/http/body.test.ts, wire.test.ts, src/infra/bot-api.fake.test.ts.
+Критерии фазы: сервер поднимается из окружения/.env (ServerConfig, main.ts — тест процесса), API по Bearer-токену (401 — КП 7), опрос Telegram против локального фейка Bot API (сквозной тест HeraldServer), docs/model.md — HTTP API и «Сервер».
+План ручной проверки (Автопилот — считается пройденной):
+1. cp .env c HERALD_TOKENS=nur:t, HERALD_PEOPLE=nur:<chat_id>, HERALD_BOT_TOKEN=<тестовый бот>; bun src/server/main.ts → «herald слушает http://127.0.0.1:4518/».
+2. curl -s localhost:4518/health → {"ok":true}; curl -s -XPOST localhost:4518/v1/notify -d '{}' → 401.
+3. curl -XPOST -H 'Authorization: Bearer t' localhost:4518/v1/notify -d '{"session":{"host":"h","root":"/p"},"text":"привет"}' → {"ok":true}, в Telegram «[h · p] привет».
+4. /v1/ask с вариантами → кнопки в Telegram; /v1/question c waitMs 30000 — нажать кнопку → status answered.
+5. Ctrl+C → «SIGINT, остановка», код 0.
+Реальный бот — в смоуке Фазы 6.
+Подтверждение: Автопилот (ручная проверка считается пройденной).
