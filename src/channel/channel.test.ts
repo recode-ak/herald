@@ -234,6 +234,27 @@ describe('HeraldChannel — команды терминала', () => {
     expect(herald.notified).toEqual([]);
   });
 
+  test('после команды — статус сессии: человек видит в /sessions, что контекст сброшен', async () => {
+    const { herald, channel, until } = await setup({ terminal: { send: async () => undefined } });
+    channel.start();
+    herald.push(
+      { id: 'i_1', kind: 'command', text: '/clear', createdAt: 1 },
+      { id: 'i_2', kind: 'command', text: '/compact', createdAt: 2 },
+    );
+    await until(() => herald.acked.length === 2);
+    expect(herald.statuses).toEqual(['🧹 /clear — контекст сброшен, жду указаний', '🗜 /compact — контекст сжат']);
+  });
+
+  test('сбой статуса после команды — команда не повторяется, прочтение подтверждается', async () => {
+    const sent: string[] = [];
+    const { herald, channel, until } = await setup({ terminal: { send: async (c) => void sent.push(c) } });
+    channel.start();
+    herald.push({ id: 'i_1', kind: 'command', text: '/clear', createdAt: 1 });
+    herald.failNext('сеть');
+    await until(() => herald.acked.length === 1);
+    expect(sent).toEqual(['/clear']);
+  });
+
   test('окно не в tmux или сбой терминала — человеку уведомление, прочтение подтверждается', async () => {
     const none = await setup();
     none.channel.start();

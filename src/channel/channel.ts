@@ -317,8 +317,20 @@ export class HeraldChannel {
       await terminal.send(command);
     } catch (error) {
       await this.herald.notify(`⚠️ ${command} не выполнена: ${HeraldChannel.message(error)}`);
+      return;
     }
+    // Окно то же, а разговор новый: прежний статус в /sessions сбивал бы с толку.
+    // Сбой статуса — только в лог: иначе прочтение не подтвердится и команда выполнится ещё раз.
+    const status = HeraldChannel.AFTER_COMMAND[command];
+    if (status)
+      await this.herald.status(status).catch((e) => this.log(`herald channel: статус: ${HeraldChannel.message(e)}`));
   }
+
+  /** Статус сессии после команды терминала. */
+  private static readonly AFTER_COMMAND: Readonly<Record<string, string>> = {
+    '/clear': '🧹 /clear — контекст сброшен, жду указаний',
+    '/compact': '🗜 /compact — контекст сжат',
+  };
 
   /** Запрос подтверждения → вопрос человеку. Сбой — в лог: Claude Code всё равно спросит в терминале. */
   private async askPermission(request: PermissionRequest): Promise<void> {
