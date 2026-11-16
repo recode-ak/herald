@@ -1,0 +1,202 @@
+import { describe, expect, test } from 'bun:test';
+import { DomainError } from '../domain/errors.ts';
+import { InboxItem } from '../domain/inbox.ts';
+import { Session } from '../domain/session.ts';
+import { AgentService } from './agent.ts';
+import { ForbiddenError, NotFoundError } from './ports.ts';
+import { TelegramError } from './telegram.ts';
+import { ann, NUR_CHAT, nur, testkit } from './testkit.fake.ts';
+
+function setup() {
+  const kit = testkit();
+  return { ...kit, agent: new AgentService(kit) };
+}
+
+const nurKey = Session.keyOf(nur.session);
+const db = {
+  text: 'Какую БД?',
+  options: [
+    { id: 'A', text: 'SQLite' },
+    { id: 'B', text: 'Postgres' },
+  ],
+  recommended: 'A',
+};
+
+describe('AgentService.notify', () => {
+  test('сообщение получателю токена с шапкой [host · проект]; сессия регистрируется', async () => {
+    const { agent, telegram, store, clock } = setup();
+    await agent.notify(nur, 'Фаза 2 готова');
+
+    const msg = telegram.last(NUR_CHAT);
+    expect(msg?.text).toBe('[laptop · u7-school]\nФаза 2 готова');
+    expect(store.session(nurKey)?.lastSeenAt).toBe(clock.now());
+    expect(store.link(NUR_CHAT, msg!.messageId)).toEqual({
+      chatId: NUR_CHAT,
+      messageId: msg!.messageId,
+      sessionKey: nurKey,
+    });
+  });
+
+  test('ошибка доставки — ошибка; связь не сохраняется', async () => {
+    const { agent, telegram, store } = setup();
+    telegram.failNext('бот заблокирован');
+    await expect(agent.notify(nur, 'x')).rejects.toBeInstanceOf(TelegramError);
+    expect(store.linksOfQuestion('нет')).toEqual([]);
+    expect(telegram.sentTo(NUR_CHAT)).toEqual([]);
+  });
+
+  test('пустой текст — DomainError', async () => {
+    const { agent } = setup();
+    await expect(agent.notify(nur, '  ')).rejects.toBeInstanceOf(DomainError);
+  });
+
+  test('явное имя сессии — проект в шапке', async () => {
+    const { agent, telegram } = setup();
+    await agent.notify({ ...nur, session: { ...nur.session, name: 'ops' } }, 'x');
+    expect(telegram.last(NUR_CHAT)?.text).toBe('[laptop · ops]\nx');
+  });
+
+  test('сессия чужого человека с тем же ключом — отказ', async () => {
+    const { agent } = setup();
+    await agent.notify(nur, 'x');
+    await expect(agent.notify({ ...ann, session: nur.session }, 'y')).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
+
+describe('AgentService.ask', () => {
+  test('кнопки вариантов с пометкой рекомендованного и «Жди меня»; вопрос сохранён', async () => {
+    const { agent, telegram, store } = setup();
+    const q = await agent.ask(nur, db);
+
+    expect(q.id).toBe('q_1');
+    expect(q.status).toBe('open');
+    expect(store.question('q_1')?.sessionKey).toBe(nurKey);
+
+    const msg = telegram.last(NUR_CHAT)!;
+    expect(msg.text).toBe(
+      '[laptop · u7-school]\n❓ Какую БД?\n\nA: SQLite ⭐\nB: Postgres\n\nОтветь кнопкой или reply на это сообщение.',
+    );
+    expect(msg.buttons).toEqual([
+      [{ text: 'A ⭐', data: 'a:q_1:A' }],
+      [{ text: 'B', data: 'a:q_1:B' }],
+      [{ text: 'Жди меня', data: 'h:q_1' }],
+    ]);
+    expect(store.link(NUR_CHAT, msg.messageId)?.questionId).toBe('q_1');
+  });
+
+  test('без вариантов — только «Жди меня» и свободный ответ', async () => {
+    const { agent, telegram } = setup();
+    await agent.ask(nur, { text: 'Как назвать?', options: [] });
+    const msg = telegram.last(NUR_CHAT)!;
+    expect(msg.text).toBe('[laptop · u7-school]\n❓ Как назвать?\n\nОтветь reply на это сообщение.');
+    expect(msg.buttons).toEqual([[{ text: 'Жди меня', data: 'h:q_1' }]]);
+  });
+
+  test('ошибка доставки — вопрос не сохраняется', async () => {
+    const { agent, telegram, store } = setup();
+    telegram.failNext();
+    await expect(agent.ask(nur, db)).rejects.toBeInstanceOf(TelegramError);
+    expect(store.question('q_1')).toBeUndefined();
+  });
+
+  test('длинный id варианта (callback_data > 64 байт) — DomainError', async () => {
+    const { agent } = setup();
+    await expect(agent.ask(nur, { text: 'x', options: [{ id: 'Я'.repeat(40), text: 'y' }] })).rejects.toBeInstanceOf(
+      DomainError,
+    );
+  });
+});
+
+describe('AgentService.decide', () => {
+  test('решение по таймауту: сообщение обновляется, кнопки остаются', async () => {
+    const { agent, telegram, store } = setup();
+    const q = await agent.ask(nur, db);
+    const before = telegram.last(NUR_CHAT)!;
+
+    const decided = agent.decide(nur, q.id, { option: 'A' }, 'по таймауту');
+    await decided;
+    expect(store.question(q.id)?.status).toBe('decided');
+
+    const after = telegram.message(NUR_CHAT, before.messageId)!;
+    expect(after.text).toBe(`${before.text}\n\n🤖 Принят A по таймауту. Кнопки — чтобы переиграть.`);
+    expect(after.buttons).toEqual(before.buttons);
+  });
+
+  test('свободный текст решения', async () => {
+    const { agent, telegram } = setup();
+    const q = await agent.ask(nur, { text: 'Как назвать?', options: [] });
+    await agent.decide(nur, q.id, { text: 'herald' }, 'по таймауту');
+    expect(telegram.last(NUR_CHAT)?.text).toEndWith('🤖 Принято «herald» по таймауту. Кнопки — чтобы переиграть.');
+  });
+
+  test('чужой вопрос — ForbiddenError, неизвестный — NotFoundError', async () => {
+    const { agent } = setup();
+    const q = await agent.ask(nur, db);
+    await expect(agent.decide(ann, q.id, { option: 'A' }, 'x')).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(agent.decide(nur, 'q_9', { option: 'A' }, 'x')).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  test('ошибка правки сообщения не отменяет решение', async () => {
+    const { agent, telegram, store } = setup();
+    const q = await agent.ask(nur, db);
+    telegram.failNext();
+    await agent.decide(nur, q.id, { option: 'B' }, 'по таймауту');
+    expect(store.question(q.id)?.status).toBe('decided');
+  });
+});
+
+describe('AgentService.status', () => {
+  test('статус сохраняется, в Telegram ничего не уходит', async () => {
+    const { agent, telegram, store, clock } = setup();
+    await agent.status(nur, 'Фаза 2: сценарии');
+    expect(store.session(nurKey)?.status).toEqual({ text: 'Фаза 2: сценарии', at: clock.now() });
+    expect(telegram.sentTo(NUR_CHAT)).toEqual([]);
+  });
+});
+
+describe('AgentService.inbox и ack', () => {
+  function directive(kit: ReturnType<typeof setup>, id: string, text: string) {
+    kit.store.saveInboxItem(
+      InboxItem.create({ id, sessionKey: nurKey, person: 'nur', kind: 'directive', text }, kit.clock.now()),
+    );
+  }
+
+  test('выдача непрочитанных; сессия отмечается активной', async () => {
+    const kit = setup();
+    await kit.agent.status(nur, 'старт');
+    directive(kit, 'i_1', 'стоп');
+    kit.clock.advance(1000);
+    expect((await kit.agent.inbox(nur)).map((i) => i.text)).toEqual(['стоп']);
+    expect(kit.store.session(nurKey)?.lastSeenAt).toBe(kit.clock.now());
+  });
+
+  test('ack: отметка «в ящике» меняется на «прочитано агентом», повторный ack — без правок', async () => {
+    const kit = setup();
+    directive(kit, 'i_1', 'стоп');
+    const mark = await kit.telegram.send({ chatId: NUR_CHAT, text: '📥 в ящике сессии u7-school' });
+    kit.store.saveLink({ chatId: NUR_CHAT, messageId: mark, sessionKey: nurKey, inboxId: 'i_1' });
+
+    expect(await kit.agent.ack(nur, ['i_1'])).toEqual(['i_1']);
+    expect(kit.telegram.message(NUR_CHAT, mark)?.text).toBe('✅ прочитано агентом · сессия u7-school');
+    expect(await kit.agent.inbox(nur)).toEqual([]);
+
+    expect(await kit.agent.ack(nur, ['i_1'])).toEqual([]);
+    expect(kit.telegram.edits).toHaveLength(1);
+  });
+
+  test('ack неизвестного id — DomainError; ничего не отмечено', async () => {
+    const kit = setup();
+    directive(kit, 'i_1', 'стоп');
+    await expect(kit.agent.ack(nur, ['i_1', 'i_9'])).rejects.toBeInstanceOf(DomainError);
+    expect((await kit.agent.inbox(nur)).map((i) => i.id)).toEqual(['i_1']);
+  });
+
+  test('ошибка правки отметки не мешает подтверждению', async () => {
+    const kit = setup();
+    directive(kit, 'i_1', 'стоп');
+    const mark = await kit.telegram.send({ chatId: NUR_CHAT, text: '📥' });
+    kit.store.saveLink({ chatId: NUR_CHAT, messageId: mark, sessionKey: nurKey, inboxId: 'i_1' });
+    kit.telegram.failNext();
+    expect(await kit.agent.ack(nur, ['i_1'])).toEqual(['i_1']);
+  });
+});

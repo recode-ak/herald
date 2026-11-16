@@ -39,13 +39,18 @@ export class FakeTelegram implements TelegramPort {
     this.callbackAnswers.push({ callbackId, ...(text !== undefined && { text }) });
   }
 
+  /** Копия сообщения: правки после чтения её не меняют. */
   message(chatId: number, messageId: number): FakeMessage | undefined {
-    return this.messages.get(FakeTelegram.key(chatId, messageId));
+    const message = this.messages.get(FakeTelegram.key(chatId, messageId));
+    return message && structuredClone(message);
   }
 
   /** Сообщения чата в порядке отправки. */
   sentTo(chatId: number): FakeMessage[] {
-    return [...this.messages.values()].filter((m) => m.chatId === chatId).sort((a, b) => a.messageId - b.messageId);
+    return [...this.messages.values()]
+      .filter((m) => m.chatId === chatId)
+      .sort((a, b) => a.messageId - b.messageId)
+      .map((m) => structuredClone(m));
   }
 
   last(chatId: number): FakeMessage | undefined {
