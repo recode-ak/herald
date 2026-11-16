@@ -1,0 +1,4 @@
+Задача: Порт Telegram и фейк (Фаза 2).
+- src/app/telegram.ts — TelegramPort (send с кнопками и replyTo → message_id, edit, answerCallback), TelegramError, тип входящего апдейта TelegramUpdate (message с replyTo / callback).
+- src/app/telegram.fake.ts — FakeTelegram: сообщения по чатам, история правок, ответы на callback, failNext для ошибок доставки.
+- src/app/telegram.fake.test.ts — 5 тестов.
