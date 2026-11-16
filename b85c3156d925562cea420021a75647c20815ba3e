@@ -1,0 +1,4 @@
+Задача: HTTP API (Bun.serve), Фаза 3.
+Сделано: класс HttpApi (src/http/api.ts) — POST /v1/{notify,ask,question,decide,status,inbox,ack}, GET /health; Bearer-токен → человек (401), сессия — поле session тела; ошибки: 400 (запрос/домен), 403, 404, 405, 502 (Telegram), 500. waitMs ограничен maxWaitMs (≤240 с, idleTimeout Bun.serve = maxWait + 15 с). RequestBody (body.ts) — типизированный разбор JSON без зависимостей; Wire (wire.ts) — формы ответа QuestionWire/InboxItemWire, общие с будущим клиентом.
+Файлы: src/http/api.ts, api.test.ts, body.ts, wire.ts.
+Почему: КП 7 (неверный токен), long poll для CLI и канала.
