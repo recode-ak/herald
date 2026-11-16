@@ -89,9 +89,18 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: сервер работает на kalki-server за `https://herald.u7-hub.kz`; реальный бот проходит КП 1–7 (КП 6 — в живой сессии Claude Code); установка клиента — не больше 5 команд (КП 8). Выкатка и действия на сервере — с уведомлением и ожиданием подтверждения.
 
-- [~] Task: Действия Нурболата (уведомление): бот в BotFather, DNS `herald.u7-hub.kz`, репо на GitHub (публичность — вопрос в уведомлении)
+- [x] Task: Действия Нурболата (уведомление): бот в BotFather, DNS `herald.u7-hub.kz`, репо на GitHub (публичность — вопрос в уведомлении)
+    - [x] Бот создан, `HERALD_BOT_TOKEN` — в `/srv/herald/.env` (положил Нурболат); chat_id Нурболата — в памяти агента (в публичное репо не кладём)
+    - [x] DNS `herald.u7-hub.kz` → 89.167.20.233 (kalki-server)
+    - [x] Репо `recode-ak/herald`, публичное (решение Нурболата 2026-11-16); локально `origin` = `git@github.com:recode-ak/herald.git`, репо пока пустое
 - [x] Task: Скрипты и документы деплоя — `scripts/deploy.sh`, `backup.contract`, `scripts/backup.sh`, `docs/deploy.md`, `docs/install.md` (сервер и клиент) (8b85778)
 - [ ] Task: Выкатка на kalki-server — `/srv/herald`, `.env` (600), pm2; nginx и certbot — Нурболат (sudo); мониторинг health-check server-ops — по согласованию
+    - [ ] Push `main` в `origin` (по ssh) — подтверждение Нурболата
+    - [ ] `/srv/herald` сейчас не клон: в нём только `.env` (права 664) — клонировать в непустой каталог (`git init`, `remote add`, `fetch`, `checkout main`), `chmod 600 .env`
+    - [ ] `.env`: дописать `HERALD_TOKENS=nur:<токен laptop>,nur:<токен kalki-server>` (`openssl rand -hex 24`) и `HERALD_PEOPLE=nur:<chat_id из памяти>`
+    - [ ] `bash scripts/deploy.sh` (pm2 start), проверка `/health`, бэкап `bash scripts/backup.sh manual`
+    - [ ] Нурболат (sudo): nginx по `docs/deploy.md` + `certbot --nginx -d herald.u7-hub.kz`
+    - [ ] Мониторинг: `HEALTH_INTERNAL_SERVICES` server-ops — спросить согласие
 - [ ] Task: Смоук на реальном боте — КП 1–7, результат — в git note
 - [ ] Task: Conductor - User Manual Verification 'Фаза 6: Деплой и установка' (Protocol in workflow.md)
 

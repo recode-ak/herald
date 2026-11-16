@@ -7,7 +7,7 @@
 Нужны Bun ≥ 1.4, бот из BotFather и chat_id получателей (напиши боту `/start`, затем `curl -s https://api.telegram.org/bot<токен>/getUpdates` — поле `message.chat.id`; пока сервер не запущен).
 
 ```sh
-git clone <репо herald> herald && cd herald
+git clone https://github.com/recode-ak/herald.git herald && cd herald
 bun install --production --frozen-lockfile
 install -m 600 /dev/null .env && $EDITOR .env
 bun src/server/main.ts                          # «herald слушает http://127.0.0.1:4518/»
@@ -30,7 +30,7 @@ HERALD_PEOPLE=nur:<chat_id>
 Нужны Bun ≥ 1.3 и git.
 
 ```sh
-git clone <репо herald> ~/dev/tools/herald && cd ~/dev/tools/herald
+git clone https://github.com/recode-ak/herald.git ~/dev/tools/herald && cd ~/dev/tools/herald
 bun install --production
 bun run link                                   # → ~/.local/bin/herald
 mkdir -p ~/.config/herald && printf '{"serverUrl":"https://herald.u7-hub.kz","token":"<токен>","host":"<имя машины>"}\n' > ~/.config/herald/config.json

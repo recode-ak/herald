@@ -21,7 +21,7 @@ Telegram опрашивает только этот процесс (long polling
 
 ```bash
 ssh kalki_server
-git clone <репо herald> /srv/herald && cd /srv/herald
+git clone https://github.com/recode-ak/herald.git /srv/herald && cd /srv/herald
 install -m 600 /dev/null .env && $EDITOR .env      # HERALD_BOT_TOKEN, HERALD_TOKENS, HERALD_PEOPLE
 bash scripts/deploy.sh                              # зависимости, pm2 start, проверка /health
 ```
