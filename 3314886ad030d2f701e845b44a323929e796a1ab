@@ -1,0 +1,12 @@
+Отчёт о верификации — Фаза 5: Channel для Claude Code.
+Автотесты: CI=true bun run check — biome, tsc --noEmit, 249 pass / 0 fail. Добавлен src/channel/herald.fake.test.ts.
+Критерии фазы: capability claude/channel, инструменты reply/notify/ask/decide/status, входящие → notifications/claude/channel с meta → ack (channel.test.ts, InMemoryTransport; test/e2e/channel.test.ts — процесс по stdio ↔ HeraldServer ↔ FakeBotApi); подтверждение действий — HERALD_PERMISSION_RELAY=1, выключено по умолчанию; docs/install.md — подключение.
+План ручной проверки (Автопилот — считается пройденной; живая сессия — смоук Фазы 6, КП 6):
+1. Сервер локально с тестовым ботом; ~/.config/herald/config.json на него.
+2. claude mcp add --scope user herald -- bun ~/dev/tools/herald/src/channel/main.ts
+3. claude --dangerously-load-development-channels server:herald; попросить агента «отправь мне reply 'привет'» → сообщение в Telegram.
+4. Ответить reply на это сообщение → в сессии <channel source="herald" kind="directive">, в Telegram «✅ прочитано агентом».
+5. Попросить ask с вариантами → нажать кнопку → событие kind="answer" с question_id.
+6. С HERALD_PERMISSION_RELAY=1 — действие с подтверждением → вопрос «🔐 Разрешить …?» в Telegram → «Разрешить» → действие выполнено.
+Риск: доставка посреди длинного хода — только в живой сессии (Ф6).
+Подтверждение: Автопилот (ручная проверка считается пройденной).
