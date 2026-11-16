@@ -44,7 +44,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] Реализация
 - [x] Task: Conductor - User Manual Verification 'Фаза 2: Хранилище и сценарии' (0812373) (Protocol in workflow.md)
 
-## Фаза 3: HTTP-сервер и Telegram-адаптер
+## Фаза 3: HTTP-сервер и Telegram-адаптер [checkpoint: fa31306]
 
 Критерии фазы: сервер поднимается из `.env`, отдаёт API по Bearer-токену, опрашивает Telegram (в тестах — локальный фейк Bot API); `docs/model.md` описывает HTTP API.
 
@@ -55,7 +55,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] Тесты против локального фейка Bot API: `getUpdates` long polling с сохранением offset, `sendMessage` с inline-кнопками, `editMessageText`, `answerCallbackQuery`, ошибки и повторы
     - [x] Реализация `src/infra/telegram`
 - [x] Task: Точка входа сервера — конфиг из `.env`, сборка, корректная остановка; `docs/model.md` — HTTP API (2c68fa8)
-- [ ] Task: Conductor - User Manual Verification 'Фаза 3: HTTP-сервер и Telegram-адаптер' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 3: HTTP-сервер и Telegram-адаптер' (fa31306) (Protocol in workflow.md)
 
 ## Фаза 4: CLI
 
