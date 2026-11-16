@@ -108,7 +108,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [ ] КП 6 (канал в живой сессии Claude Code) — перенесён в Фазу 7, после подключения канала
 - [x] Task: Conductor - User Manual Verification 'Фаза 6: Деплой и установка' (d3640e3) (Protocol in workflow.md)
 
-## Фаза 7: Перевод Автопилота и итог
+## Фаза 7: Перевод Автопилота и итог [checkpoint: 74affbc]
 
 Критерии фазы: КП 9 выполнен; финальный гейт зелёный; итог трека с принятыми стратегическими решениями.
 
@@ -122,7 +122,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] Память агента (u7-school, `feedback-finish-then-stop`) → herald
     - [ ] Удалить `~/.local/bin/agent-notify` и `agent-notify.env` — агенту запрещено, за Нурболатом: `rm ~/.local/bin/agent-notify ~/.local/bin/agent-notify.env`
 - [x] Task: Финальный гейт — `bun run check`, сравнение с базовой линией; `summary.md` трека: сделанное, решения (вопрос → варианты → выбранное → как переиграть), отложенное (7894f9a)
-- [x] Task: Conductor - User Manual Verification 'Фаза 7: Перевод Автопилота и итог' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 7: Перевод Автопилота и итог' (74affbc) (Protocol in workflow.md)
 
 ## Риски
 
