@@ -1,0 +1,8 @@
+Задача: Ожидание (long poll) (Фаза 2).
+- src/app/waiter.ts — Waiter: подписки в памяти по темам q:<вопрос> / s:<сессия>, wait(topic, ms) → true по событию / false по таймауту; таймер — через Clock.sleep с отменой.
+- src/app/ports.ts — Clock.sleep(ms, signal).
+- src/app/agent.ts — awaitQuestion (ответ, полученный ожиданием, сразу ack — во входящих не дублируется; «Жди меня» ожидание не завершает), awaitInbox (непрочитанные сразу, иначе ждать). Перепроверка до дедлайна — ложные пробуждения безопасны.
+- src/app/human.ts — будит темы после ответа/указания, и только после отметки «в ящике» (иначе агент читал раньше, чем отметка появлялась — пойман тестом).
+- src/infra/system.ts — SystemClock, RandomIds (10 символов base36 без смещения).
+- testkit: ManualClock.sleep/advance/sleepers, Waiter.
+Тесты: waiter.test.ts, wait.test.ts, system.test.ts.
