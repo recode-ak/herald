@@ -1,0 +1,3 @@
+Задача: Сквозной тест test/e2e/ — КП 1–5, 7 для CLI (Фаза 4).
+Сделано: test/e2e/cli.test.ts — процесс herald (bun src/cli/main.ts) → HTTP → HeraldServer (SQLite в памяти, сценарии, TelegramBotApi, TelegramPoller) → FakeBotApi; человек — апдейты в фейке. КП1 notify и ошибка 403 → код 1; КП2 кнопка, reply, таймаут → код 2; КП3 decide правит сообщение, поздний ответ во входящих; КП4 /status и /sessions без агента; КП5 указание через reply и через выбор в /sessions попадает только своей сессии, отметки «📥 в ящике» и «✅ прочитано»; КП7 чужой chat_id игнорируется, неверный токен и чужой вопрос → код 1. FakeBotApi: журнал sent с message_id.
+Результат: 10 pass, весь набор 227 pass, 3 прогона без флаков.
