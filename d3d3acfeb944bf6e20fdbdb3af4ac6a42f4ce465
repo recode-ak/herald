@@ -1,0 +1,3 @@
+Задача: Клиент herald (общий для CLI и канала), Фаза 4.
+Сделано: ClientConfig.load (src/client/config.ts) — ~/.config/herald/config.json {serverUrl, token, host?}; HERALD_URL/TOKEN/HOST важнее файла, HERALD_CONFIG — путь; host по умолчанию — имя машины; ошибки с путём файла. SessionLocator (locator.ts) — корень git (git rev-parse --show-toplevel), вне git — cwd, явное имя (--session). HeraldClient (client.ts) — notify, status, ask, decide, ack; awaitQuestion(id, timeout?) и inbox(waitMs) переподключаются кусками до таймаута (без таймаута — бесконечно), сбои сети и 5xx при ожидании пережидаются, обычные вызовы падают сразу (HeraldClientError со status).
+Файлы: src/client/{config,locator,client}.ts и тесты (клиент — против настоящего HttpApi с коротким потолком ожидания).
