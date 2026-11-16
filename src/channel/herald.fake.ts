@@ -8,6 +8,7 @@ export class FakeHerald implements ChannelHerald {
   readonly notified: string[] = [];
   readonly statuses: string[] = [];
   readonly titles: string[] = [];
+  byes = 0;
   readonly asked: AskRequest[] = [];
   readonly decided: { id: string; choice: Choice; reason: string }[] = [];
   readonly acked: string[] = [];
@@ -36,6 +37,11 @@ export class FakeHerald implements ChannelHerald {
   async status(text: string): Promise<void> {
     this.maybeFail();
     this.statuses.push(text);
+  }
+
+  async bye(): Promise<void> {
+    this.maybeFail();
+    this.byes++;
   }
 
   async title(text: string): Promise<void> {

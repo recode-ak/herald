@@ -202,6 +202,11 @@ describe('Статус и входящие', () => {
     expect(k.telegram.sentTo(NUR_CHAT)).toEqual([]);
   });
 
+  test('bye: сессия закрыта', async () => {
+    const k = setup();
+    expect(await k.call('/v1/bye', { session })).toEqual({ status: 200, json: { ok: true } });
+  });
+
   test('title: название сессии; instance в session — отдельная сессия', async () => {
     const k = setup();
     const window = { ...session, instance: '02dc' };

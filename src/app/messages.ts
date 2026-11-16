@@ -105,10 +105,11 @@ export class Messages {
   /** Реакция на сообщение человека: агент прочитал. */
   static readonly INBOX_READ = '👀';
 
-  /** Строка `/sessions`: давность активности и последний статус. */
+  /** Строка `/sessions`: на связи или давность (закрытие), последний статус. */
   static sessionLine(session: Session, now: number): string {
     const status = session.status ? ` — ${session.status.text} (${Messages.ago(session.status.at, now)})` : '';
-    return `• ${session.host} · ${session.label} — ${Messages.ago(session.lastSeenAt, now)}${status}`;
+    const presence = session.isOnline(now) ? 'на связи' : Messages.away(session, now);
+    return `${Messages.mark(session, now)} ${session.host} · ${session.label} — ${presence}${status}`;
   }
 
   /** Строка `/status`: последний статус с давностью. */
@@ -116,7 +117,27 @@ export class Messages {
     const status = session.status
       ? `${session.status.text} (${Messages.ago(session.status.at, now)})`
       : `статуса нет (${Messages.ago(session.lastSeenAt, now)})`;
-    return `• ${session.host} · ${session.label} — ${status}`;
+    return `${Messages.mark(session, now)} ${session.host} · ${session.label} — ${status}`;
+  }
+
+  /** Предупреждение: входящее для сессии не на связи (`undefined` — на связи). */
+  static offline(session: Session, now: number): string | undefined {
+    if (session.isOnline(now)) return undefined;
+    return `⚠️ ${session.label} не на связи (${Messages.away(session, now)})`;
+  }
+
+  static offlineNotice(warning: string): string {
+    return `${warning} — прочтёт, когда подключится.`;
+  }
+
+  private static mark(session: Session, now: number): string {
+    return session.isOnline(now) ? '🟢' : '⚪';
+  }
+
+  private static away(session: Session, now: number): string {
+    return session.closedAt !== undefined
+      ? `закрыта ${Messages.ago(session.closedAt, now)}`
+      : Messages.ago(session.lastSeenAt, now);
   }
 
   static sessionButton(session: Session): string {

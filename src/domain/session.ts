@@ -27,12 +27,16 @@ export interface SessionState {
   status?: SessionStatus;
   /** Название от агента — что делает сессия; в шапке после проекта. */
   title?: string;
+  /** Окно агента закрыто (канал сообщил при выходе); снимается следующим обращением. */
+  closedAt?: number;
 }
 
 /** Сессия агента. Ключ — `host:корень`, `host:корень#окно` или `host:@имя`; время — мс эпохи. */
 export class Session {
   static readonly STATUS_MAX = 500;
   static readonly TITLE_MAX = 60;
+  /** На связи — обращалась не дольше этого (канал опрашивает ящик long poll ≤ 50 с). */
+  static readonly ONLINE_MS = 120_000;
 
   private constructor(private readonly state: SessionState) {}
 
@@ -74,6 +78,9 @@ export class Session {
   get title(): string | undefined {
     return this.state.title;
   }
+  get closedAt(): number | undefined {
+    return this.state.closedAt;
+  }
   /** Как сессию видит человек: проект и название, если есть. */
   get label(): string {
     return this.state.title ? `${this.state.project} · ${this.state.title}` : this.state.project;
@@ -81,6 +88,17 @@ export class Session {
 
   touch(now: number): void {
     this.state.lastSeenAt = now;
+    delete this.state.closedAt;
+  }
+
+  /** Окно агента закрыто: сессия не на связи до следующего обращения. */
+  close(now: number): void {
+    this.state.closedAt = now;
+  }
+
+  /** Агент сейчас слушает: недавнее обращение и окно не закрыто. */
+  isOnline(now: number): boolean {
+    return this.state.closedAt === undefined && now - this.state.lastSeenAt <= Session.ONLINE_MS;
   }
 
   setStatus(text: string, now: number): void {

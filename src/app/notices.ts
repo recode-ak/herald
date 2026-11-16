@@ -34,6 +34,13 @@ export class Notices {
     await this.bestEffort(() => this.telegram.react(chatId, messageId, Messages.INBOX_QUEUED));
   }
 
+  /** Предупреждение reply на сообщение человека: сессия не на связи, прочтёт позже. */
+  async warn(warning: string, chatId: number, replyTo: number): Promise<void> {
+    await this.bestEffort(async () => {
+      await this.telegram.send({ chatId, text: Messages.offlineNotice(warning), replyTo });
+    });
+  }
+
   /** Реакция на сообщениях входящего → «прочитано». */
   async read(item: InboxItem): Promise<void> {
     for (const link of this.store.linksOfInbox(item.id)) {

@@ -89,6 +89,13 @@ export class AgentService {
     this.deps.store.saveSession(session);
   }
 
+  /** Окно агента закрывается: сессия не на связи до следующего обращения. */
+  async bye(caller: Caller): Promise<void> {
+    const session = this.enter(caller);
+    session.close(this.deps.clock.now());
+    this.deps.store.saveSession(session);
+  }
+
   /** Название сессии — в шапке её сообщений. В Telegram отдельно не отправляется. */
   async title(caller: Caller, text: string): Promise<void> {
     const session = this.enter(caller);

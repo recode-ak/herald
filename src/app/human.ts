@@ -121,12 +121,17 @@ export class HumanService {
     });
     await this.notices.refreshQuestion(question, session);
     // Кнопка: перерисованный вопрос и всплывающий ответ — уже квитанция. Текст reply — реакция на нём.
-    if (update.kind === 'message') await this.notices.queued(item, session, update.chatId, update.messageId);
+    const warning = Messages.offline(session, clock.now());
+    if (update.kind === 'message') {
+      await this.notices.queued(item, session, update.chatId, update.messageId);
+      if (warning) await this.notices.warn(warning, update.chatId, update.messageId);
+    }
     // Будим после реакции «в ящике»: иначе агент прочтёт раньше, и «прочитано» её затрёт не по порядку.
     this.deps.waiter.notify(Waiter.questionTopic(questionId));
     this.deps.waiter.notify(Waiter.sessionTopic(session.key));
     const label = resolution.option ?? 'ответ принят';
-    return outcome === 'answer' ? `Принят ${label}` : `Переигрывание вопроса ${questionId}: ${label}`;
+    const text = outcome === 'answer' ? `Принят ${label}` : `Переигрывание вопроса ${questionId}: ${label}`;
+    return warning && update.kind === 'callback' ? `${text} · ${warning}` : text;
   }
 
   private async hold(person: PersonId, questionId: string): Promise<string> {
@@ -159,6 +164,8 @@ export class HumanService {
     );
     this.deps.store.saveInboxItem(item);
     await this.notices.queued(item, session, update.chatId, update.messageId);
+    const warning = Messages.offline(session, this.deps.clock.now());
+    if (warning) await this.notices.warn(warning, update.chatId, update.messageId);
     this.deps.waiter.notify(Waiter.sessionTopic(sessionKey));
     return undefined;
   }

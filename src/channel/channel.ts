@@ -10,6 +10,7 @@ export interface ChannelHerald {
   notify(text: string): Promise<void>;
   status(text: string): Promise<void>;
   title(text: string): Promise<void>;
+  bye(): Promise<void>;
   ask(request: AskRequest): Promise<QuestionWire>;
   decide(id: string, choice: Choice, reason: string): Promise<QuestionWire>;
   inbox(waitMs?: number): Promise<InboxItemWire[]>;
@@ -131,6 +132,7 @@ export class HeraldChannel {
   private readonly herald: ChannelHerald;
   private readonly log: (message: string) => void;
   private running = false;
+  private closing: Promise<void> | undefined;
   private loop: Promise<void> | undefined;
   /** Вопросы-подтверждения: id вопроса → request_id; решённые остаются с `undefined` (поздние ответы — не события). */
   private readonly permissions = new Map<string, string | undefined>();
@@ -182,9 +184,23 @@ export class HeraldChannel {
     this.loop = this.run();
   }
 
-  /** Остановить цикл и закрыть MCP. Висящий long poll не ждём: его результат будет отброшен. */
-  async close(): Promise<void> {
+  /**
+   * Остановить цикл, сообщить herald о закрытии окна (best effort) и закрыть MCP.
+   * Висящий long poll не ждём: его результат будет отброшен.
+   */
+  close(): Promise<void> {
+    // Повторный вызов (onclose при закрытии MCP) ждёт то же закрытие.
+    this.closing ??= this.shutdown();
+    return this.closing;
+  }
+
+  private async shutdown(): Promise<void> {
     this.running = false;
+    try {
+      await this.herald.bye();
+    } catch (error) {
+      this.log(`herald channel: bye — ${(error as Error).message}`);
+    }
     await this.server.close();
   }
 

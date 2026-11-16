@@ -5,7 +5,7 @@ import { Inbox, InboxItem, type InboxKind } from '../domain/inbox.ts';
 import { Question, type QuestionStatus } from '../domain/question.ts';
 import { Session } from '../domain/session.ts';
 
-/** Схема: v1 — таблицы, v2 — название сессии. Версия — `PRAGMA user_version`; следующая — новый элемент массива. */
+/** Схема: v1 — таблицы, v2 — название сессии, v3 — закрытие окна. Версия — `PRAGMA user_version`; следующая — новый элемент массива. */
 const MIGRATIONS = [
   `
   CREATE TABLE sessions (
@@ -64,6 +64,7 @@ const MIGRATIONS = [
   );
   `,
   'ALTER TABLE sessions ADD COLUMN title TEXT;',
+  'ALTER TABLE sessions ADD COLUMN closed_at INTEGER;',
 ];
 
 interface SessionRow {
@@ -76,6 +77,7 @@ interface SessionRow {
   status_text: string | null;
   status_at: number | null;
   title: string | null;
+  closed_at: number | null;
 }
 
 interface QuestionRow {
@@ -152,8 +154,8 @@ export class SqliteStore implements Store {
     const s = session.toState();
     this.db
       .query(
-        `INSERT OR REPLACE INTO sessions (key, person, host, project, root, last_seen_at, status_text, status_at, title)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO sessions (key, person, host, project, root, last_seen_at, status_text, status_at, title, closed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         s.key,
@@ -165,6 +167,7 @@ export class SqliteStore implements Store {
         s.status?.text ?? null,
         s.status?.at ?? null,
         s.title ?? null,
+        s.closedAt ?? null,
       );
   }
 
@@ -320,6 +323,7 @@ export class SqliteStore implements Store {
       lastSeenAt: r.last_seen_at,
       ...(r.status_text !== null && r.status_at !== null && { status: { text: r.status_text, at: r.status_at } }),
       ...(r.title !== null && { title: r.title }),
+      ...(r.closed_at !== null && { closedAt: r.closed_at }),
     });
   }
 

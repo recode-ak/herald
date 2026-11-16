@@ -52,6 +52,11 @@ export class HeraldClient {
     await this.call('/v1/status', { text });
   }
 
+  /** Окно агента закрывается. */
+  async bye(): Promise<void> {
+    await this.call('/v1/bye', {});
+  }
+
   async title(text: string): Promise<void> {
     await this.call('/v1/title', { text });
   }

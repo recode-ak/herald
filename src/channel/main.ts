@@ -30,7 +30,11 @@ const herald = new HeraldClient({
   clock: new SystemClock(),
 });
 const channel = new HeraldChannel({ herald, log, permissionRelay: process.env.HERALD_PERMISSION_RELAY === '1' });
-channel.onclose = () => process.exit(0);
+// Claude Code закрыл канал или процесс останавливают — herald узнаёт, что окно закрыто (сессия ⚪).
+const exit = () => void channel.close().finally(() => process.exit(0));
+channel.onclose = exit;
+process.on('SIGTERM', exit);
+process.on('SIGINT', exit);
 await channel.connect(new StdioServerTransport());
 channel.start();
 log(`herald channel: сессия ${Session.keyOf(session)} → ${config.serverUrl}`);

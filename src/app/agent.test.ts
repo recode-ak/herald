@@ -170,6 +170,15 @@ describe('AgentService — разметка', () => {
   });
 });
 
+describe('AgentService.bye', () => {
+  test('окно закрыто — сессия не на связи', async () => {
+    const { agent, store, clock } = setup();
+    await agent.bye(nur);
+    expect(store.session(nurKey)?.closedAt).toBe(clock.now());
+    expect(store.session(nurKey)?.isOnline(clock.now())).toBe(false);
+  });
+});
+
 describe('AgentService.title', () => {
   test('название сессии — в шапке следующих сообщений', async () => {
     const { agent, telegram, store } = setup();

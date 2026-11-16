@@ -66,6 +66,15 @@ describe('HeraldChannel — инструменты', () => {
     expect(herald.notified).toEqual(['Готово', 'Фаза 5']);
   });
 
+  test('close — herald узнаёт, что окно закрыто; сбой bye не мешает закрытию', async () => {
+    const first = await setup();
+    await first.channel.close();
+    expect(first.herald.byes).toBe(1);
+    const second = await setup();
+    second.herald.failNext('сеть');
+    await second.channel.close();
+  });
+
   test('title — название сессии', async () => {
     const { herald, call } = await setup();
     await call('title', { text: 'dmg-ui · Ф4' });

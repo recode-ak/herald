@@ -137,6 +137,33 @@ describe('Ответы на вопрос', () => {
   });
 });
 
+describe('Сессия не на связи — предупреждение', () => {
+  test('указание: реакция и reply «прочтёт, когда подключится»; на связи — без предупреждения', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    const notice = k.telegram.last(NUR_CHAT)!.messageId;
+    await k.say(NUR_CHAT, 'раз', notice);
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(1);
+
+    k.clock.advance(5 * 60_000);
+    await k.say(NUR_CHAT, 'два', notice);
+    expect(k.telegram.reaction(NUR_CHAT, 1002)).toBe('✍');
+    expect(k.telegram.last(NUR_CHAT)).toMatchObject({
+      text: '⚠️ u7-school не на связи (5 мин назад) — прочтёт, когда подключится.',
+      replyTo: 1002,
+    });
+  });
+
+  test('ответ кнопкой закрытой сессии — предупреждение во всплывающем ответе', async () => {
+    const k = setup();
+    const q = await k.agent.ask(nur, db);
+    const qMsg = k.telegram.last(NUR_CHAT)!.messageId;
+    await k.agent.bye(nur);
+    await k.press(NUR_CHAT, qMsg, `a:${q.id}:B`);
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('Принят B · ⚠️ u7-school не на связи (закрыта только что)');
+  });
+});
+
 describe('Указания', () => {
   test('reply на уведомление сессии → указание этой сессии', async () => {
     const k = setup();
@@ -210,8 +237,8 @@ describe('/sessions и /status', () => {
     expect(menu.text).toBe(
       [
         'Активные сессии:',
-        '• laptop · herald — 2 ч назад',
-        '• laptop · u7-school — 2 ч назад — Фаза 2: сценарии (2 ч назад)',
+        '⚪ laptop · herald — 2 ч назад',
+        '⚪ laptop · u7-school — 2 ч назад — Фаза 2: сценарии (2 ч назад)',
         '',
         'Выбери адресата указания.',
       ].join('\n'),
@@ -225,7 +252,7 @@ describe('/sessions и /status', () => {
     await k.agent.status(nur, 'Фаза 2');
     k.clock.advance(30_000);
     await k.say(NUR_CHAT, '/status');
-    expect(k.telegram.last(NUR_CHAT)?.text).toBe('• laptop · u7-school — Фаза 2 (только что)');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('🟢 laptop · u7-school — Фаза 2 (только что)');
   });
 
   test('/status reply на сообщение сессии — только эта сессия', async () => {
@@ -235,7 +262,7 @@ describe('/sessions и /status', () => {
     await k.agent.notify(ops, 'y');
     k.clock.advance(3 * 60_000);
     await k.say(NUR_CHAT, '/status', k.telegram.last(NUR_CHAT)!.messageId);
-    expect(k.telegram.last(NUR_CHAT)?.text).toBe('• server · chronicle — бэкап (3 мин назад)');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('⚪ server · chronicle — бэкап (3 мин назад)');
   });
 
   test('нет активных сессий', async () => {
@@ -252,7 +279,20 @@ describe('/sessions и /status', () => {
     k.clock.advance(3 * 24 * HOUR - 1);
     const human = new HumanService({ ...k, activeWindowMs: 7 * 24 * HOUR });
     await human.handle({ kind: 'message', updateId: 1, chatId: NUR_CHAT, messageId: 50, text: '/status' });
-    expect(k.telegram.last(NUR_CHAT)?.text).toBe('• laptop · u7-school — статуса нет (2 дн назад)');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('⚪ laptop · u7-school — статуса нет (2 дн назад)');
+  });
+
+  test('на связи и закрытые: 🟢 — на связи, ⚪ — давность или «закрыта»', async () => {
+    const k = setup();
+    await k.agent.status(nur, 'Ф4');
+    await k.agent.notify({ ...nur, session: { host: 'laptop', root: '/home/nur/dev/herald' } }, 'x');
+    await k.agent.bye({ ...nur, session: { host: 'laptop', root: '/home/nur/dev/herald' } });
+    k.clock.advance(60_000);
+    await k.say(NUR_CHAT, '/sessions');
+    expect(k.telegram.last(NUR_CHAT)?.text.split('\n').slice(1, 3)).toEqual([
+      '⚪ laptop · herald — закрыта 1 мин назад',
+      '🟢 laptop · u7-school — на связи — Ф4 (1 мин назад)',
+    ]);
   });
 });
 

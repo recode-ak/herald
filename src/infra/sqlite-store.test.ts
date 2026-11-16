@@ -40,6 +40,7 @@ describe('SqliteStore: сессии', () => {
 
     s.setStatus('Фаза 2', 200);
     s.setTitle('ревью', 210);
+    s.close(220);
     store.saveSession(s);
     expect(store.session(s.key)?.toState()).toEqual(s.toState());
     expect(store.session('нет')).toBeUndefined();
