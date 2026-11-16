@@ -106,7 +106,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] КП 1, 2, 3, 4, 5 и неверный токен (КП 7) — CLI с ноутбука через `https://herald.u7-hub.kz`, ответы Нурболата в Telegram
     - [ ] Чужой chat_id (КП 7) — Нурболат проверит со второго аккаунта позже; до того — тест `human.test.ts`
     - [ ] КП 6 (канал в живой сессии Claude Code) — перенесён в Фазу 7, после подключения канала
-- [ ] Task: Conductor - User Manual Verification 'Фаза 6: Деплой и установка' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 6: Деплой и установка' (Protocol in workflow.md)
 
 ## Фаза 7: Перевод Автопилота и итог
 
