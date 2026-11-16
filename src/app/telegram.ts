@@ -9,7 +9,10 @@ export type Keyboard = Button[][];
 
 export interface OutgoingMessage {
   chatId: number;
+  /** Обычный текст: запасной вид, если Telegram не разобрал `html`. */
   text: string;
+  /** Тот же текст в HTML Telegram (`parse_mode: HTML`); основной вид, если задан. */
+  html?: string;
   buttons?: Keyboard;
   /** message_id, на который отвечаем. */
   replyTo?: number;
@@ -24,8 +27,8 @@ export class TelegramError extends Error {
 export interface TelegramPort {
   /** Отправить сообщение; возвращает его message_id. */
   send(message: OutgoingMessage): Promise<number>;
-  /** Заменить текст и кнопки сообщения. Без `buttons` кнопки убираются. */
-  edit(chatId: number, messageId: number, text: string, buttons?: Keyboard): Promise<void>;
+  /** Заменить текст и кнопки сообщения. Без `buttons` кнопки убираются; `html` — как в `OutgoingMessage`. */
+  edit(chatId: number, messageId: number, text: string, buttons?: Keyboard, html?: string): Promise<void>;
   /** Поставить реакцию на сообщение (заменяет прежнюю реакцию бота). `emoji` — из разрешённых Telegram. */
   react(chatId: number, messageId: number, emoji: string): Promise<void>;
   /** Ответить на нажатие кнопки (снять «часики»), опционально — всплывающий текст. */

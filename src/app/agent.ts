@@ -38,7 +38,11 @@ export class AgentService {
     if (!body) throw new DomainError('текст уведомления пуст');
     const session = this.enter(caller);
     const chatId = this.deps.access.chatIdOf(caller.person);
-    const messageId = await this.deps.telegram.send({ chatId, text: Messages.notify(session, body) });
+    const messageId = await this.deps.telegram.send({
+      chatId,
+      text: Messages.notify(session, body),
+      html: Messages.notifyHtml(session, body),
+    });
     this.deps.store.saveLink({ chatId, messageId, sessionKey: session.key });
   }
 
@@ -55,7 +59,12 @@ export class AgentService {
       }
     }
     const chatId = this.deps.access.chatIdOf(caller.person);
-    const messageId = await this.deps.telegram.send({ chatId, text: Messages.question(question, session), buttons });
+    const messageId = await this.deps.telegram.send({
+      chatId,
+      text: Messages.question(question, session),
+      html: Messages.questionHtml(question, session),
+      buttons,
+    });
     this.deps.store.transaction(() => {
       this.deps.store.saveQuestion(question);
       this.deps.store.saveLink({ chatId, messageId, sessionKey: session.key, questionId: question.id });

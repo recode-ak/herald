@@ -1,8 +1,30 @@
 import type { Question, Resolution } from '../domain/question.ts';
 import type { Session } from '../domain/session.ts';
+import { Markup } from './markup.ts';
 import type { Keyboard } from './telegram.ts';
 
-/** Тексты и кнопки сообщений бота. Без parse_mode — экранирование не нужно. */
+/** Как оформить части сообщения: обычный текст (запасной) или HTML Telegram. */
+interface Style {
+  /** Текст агента: Markdown → разметка. */
+  markdown(text: string): string;
+  /** Служебный текст herald: только экранирование. */
+  plain(text: string): string;
+  bold(html: string): string;
+  italic(html: string): string;
+}
+
+const PLAIN: Style = { markdown: (t) => t, plain: (t) => t, bold: (t) => t, italic: (t) => t };
+const HTML: Style = {
+  markdown: (t) => Markup.markdown(t),
+  plain: (t) => Markup.escape(t),
+  bold: (t) => `<b>${t}</b>`,
+  italic: (t) => `<i>${t}</i>`,
+};
+
+/**
+ * Тексты и кнопки сообщений бота. Сообщения агента — в двух видах: HTML (основной, `parse_mode: HTML`)
+ * и обычный текст (запасной, если Telegram не разобрал разметку; его же видят тесты).
+ */
 // biome-ignore lint/complexity/noStaticOnlyClass: правило проекта — класс с зоной ответственности вместо россыпи функций
 export class Messages {
   static readonly CALLBACK_MAX_BYTES = 64;
@@ -12,29 +34,52 @@ export class Messages {
   }
 
   static notify(session: Session, text: string): string {
-    return `${Messages.header(session)}\n${text}`;
+    return Messages.notifyIn(PLAIN, session, text);
+  }
+
+  static notifyHtml(session: Session, text: string): string {
+    return Messages.notifyIn(HTML, session, text);
   }
 
   /** Текст вопроса с текущим состоянием: решение и переигрывания. */
   static question(question: Question, session: Session): string {
-    const lines = [Messages.header(session), `❓ ${question.text}`];
+    return Messages.questionIn(PLAIN, question, session);
+  }
+
+  static questionHtml(question: Question, session: Session): string {
+    return Messages.questionIn(HTML, question, session);
+  }
+
+  private static notifyIn(style: Style, session: Session, text: string): string {
+    return `${style.bold(style.plain(Messages.header(session)))}\n${style.markdown(text)}`;
+  }
+
+  private static questionIn(style: Style, question: Question, session: Session): string {
+    const lines = [
+      style.bold(style.plain(Messages.header(session))),
+      `❓ ${style.bold(style.markdown(question.text))}`,
+    ];
     if (question.options.length > 0) {
-      lines.push('', ...question.options.map((o) => `${o.id}: ${o.text}${Messages.star(question, o.id)}`));
+      lines.push(
+        '',
+        ...question.options.map(
+          (o) => `${style.bold(style.plain(o.id))}: ${style.markdown(o.text)}${Messages.star(question, o.id)}`,
+        ),
+      );
     }
-    lines.push(
-      '',
-      question.options.length > 0 ? 'Ответь кнопкой или reply на это сообщение.' : 'Ответь reply на это сообщение.',
-    );
+    const hint =
+      question.options.length > 0 ? 'Ответь кнопкой или reply на это сообщение.' : 'Ответь reply на это сообщение.';
+    lines.push('', style.italic(hint));
     let text = lines.join('\n');
     if (question.heldAt !== undefined && question.status === 'open') text += '\n\n⏸ Агент ждёт твоего ответа.';
     const r = question.resolution;
     if (r?.by === 'agent') {
-      const hint = Messages.humanAnswered(question) ? '' : ' Кнопки — чтобы переиграть.';
-      text += `\n\n🤖 ${Messages.choice(r)}${r.reason ? ` ${r.reason}` : ''}.${hint}`;
+      const replay = Messages.humanAnswered(question) ? '' : ' Кнопки — чтобы переиграть.';
+      text += `\n\n🤖 ${style.plain(`${Messages.choice(r)}${r.reason ? ` ${r.reason}` : ''}`)}.${replay}`;
     } else if (r?.by === 'human') {
-      text += `\n\n👤 ${Messages.choice(r)}.`;
+      text += `\n\n👤 ${style.plain(Messages.choice(r))}.`;
     }
-    for (const late of question.lateAnswers) text += `\n🔁 Переигрывание: ${Messages.choice(late)}.`;
+    for (const late of question.lateAnswers) text += `\n🔁 Переигрывание: ${style.plain(Messages.choice(late))}.`;
     return text;
   }
 

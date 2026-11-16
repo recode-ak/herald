@@ -50,6 +50,18 @@ export class FakeBotApi {
     this.failures.set(method, [...(this.failures.get(method) ?? []), ...failures]);
   }
 
+  /** Текст сообщения, как его видит человек: при `parse_mode: HTML` — без тегов и сущностей. */
+  static plainText(params: Record<string, unknown>): string {
+    const text = String(params.text);
+    if (params.parse_mode !== 'HTML') return text;
+    return text
+      .replace(/<[^>]+>/g, '')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&amp;', '&');
+  }
+
   callsOf(method: string): Record<string, unknown>[] {
     return this.calls.filter((c) => c.method === method).map((c) => c.params);
   }

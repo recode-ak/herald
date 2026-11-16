@@ -67,6 +67,31 @@ describe('TelegramBotApi — исходящие', () => {
     ]);
   });
 
+  test('html — parse_mode HTML; Telegram не разобрал разметку — повтор обычным текстом', async () => {
+    const { fake, api } = setup();
+    await api.send({ chatId: 111, text: '**x**', html: '<b>x</b>' });
+    expect(fake.callsOf('sendMessage').at(-1)).toEqual({ chat_id: 111, text: '<b>x</b>', parse_mode: 'HTML' });
+
+    const parseError = {
+      status: 400,
+      body: { ok: false, error_code: 400, description: "Bad Request: can't parse entities: unclosed tag" },
+    };
+    fake.failNext('sendMessage', parseError);
+    expect(await api.send({ chatId: 111, text: '**y**', html: '<b>y' })).toBeNumber();
+    expect(fake.callsOf('sendMessage').at(-1)).toEqual({ chat_id: 111, text: '**y**' });
+
+    await api.edit(111, 5, '**z**', undefined, '<b>z</b>');
+    expect(fake.callsOf('editMessageText').at(-1)).toMatchObject({ text: '<b>z</b>', parse_mode: 'HTML' });
+    fake.failNext('editMessageText', parseError);
+    await api.edit(111, 5, '**w**', undefined, '<b>w');
+    expect(fake.callsOf('editMessageText').at(-1)).toEqual({
+      chat_id: 111,
+      message_id: 5,
+      text: '**w**',
+      reply_markup: { inline_keyboard: [] },
+    });
+  });
+
   test('setMessageReaction: одна эмодзи-реакция заменяет прежнюю', async () => {
     const { fake, api } = setup();
     await api.react(111, 42, '👀');

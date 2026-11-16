@@ -154,6 +154,22 @@ describe('AgentService.status', () => {
   });
 });
 
+describe('AgentService — разметка', () => {
+  test('notify и ask уходят с HTML; при правке вопроса HTML тоже обновляется', async () => {
+    const { agent, telegram } = setup();
+    await agent.notify(nur, '**Фаза 4** готова');
+    expect(telegram.last(NUR_CHAT)?.html).toBe('<b>[laptop · u7-school]</b>\n<b>Фаза 4</b> готова');
+
+    const q = await agent.ask(nur, db);
+    const msg = telegram.last(NUR_CHAT)!;
+    expect(msg.html).toStartWith('<b>[laptop · u7-school]</b>\n❓ <b>Какую БД?</b>');
+    await agent.decide(nur, q.id, { option: 'A' }, 'по таймауту');
+    expect(telegram.message(NUR_CHAT, msg.messageId)?.html).toEndWith(
+      '🤖 Принят A по таймауту. Кнопки — чтобы переиграть.',
+    );
+  });
+});
+
 describe('AgentService.title', () => {
   test('название сессии — в шапке следующих сообщений', async () => {
     const { agent, telegram, store } = setup();

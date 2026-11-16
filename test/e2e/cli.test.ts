@@ -84,7 +84,7 @@ async function sent(match: (m: Sent) => boolean): Promise<Sent> {
   throw new Error('бот не отправил ожидаемое сообщение');
 }
 
-const textOf = (m: Sent) => String(m.params.text);
+const textOf = (m: Sent) => FakeBotApi.plainText(m.params);
 /** Бот поставил реакцию `emoji` на сообщение `messageId`. */
 const reacted = (messageId: number, emoji: string) =>
   fake

@@ -6,7 +6,7 @@ export interface FakeMessage extends OutgoingMessage {
 
 /** Telegram в памяти для тестов: хранит сообщения по чатам, правки и ответы на callback. */
 export class FakeTelegram implements TelegramPort {
-  readonly edits: { chatId: number; messageId: number; text: string; buttons?: Keyboard }[] = [];
+  readonly edits: { chatId: number; messageId: number; text: string; buttons?: Keyboard; html?: string }[] = [];
   readonly callbackAnswers: { callbackId: string; text?: string }[] = [];
   /** Реакции в порядке постановки; сообщение человека в фейке не хранится — проверки нет. */
   readonly reactions: { chatId: number; messageId: number; emoji: string }[] = [];
@@ -26,14 +26,16 @@ export class FakeTelegram implements TelegramPort {
     return messageId;
   }
 
-  async edit(chatId: number, messageId: number, text: string, buttons?: Keyboard): Promise<void> {
+  async edit(chatId: number, messageId: number, text: string, buttons?: Keyboard, html?: string): Promise<void> {
     this.maybeFail();
     const message = this.messages.get(FakeTelegram.key(chatId, messageId));
     if (!message) throw new TelegramError(`сообщения ${chatId}/${messageId} нет`);
     message.text = text;
     if (buttons) message.buttons = buttons;
     else delete message.buttons;
-    this.edits.push({ chatId, messageId, text, ...(buttons && { buttons }) });
+    if (html !== undefined) message.html = html;
+    else delete message.html;
+    this.edits.push({ chatId, messageId, text, ...(buttons && { buttons }), ...(html !== undefined && { html }) });
   }
 
   async react(chatId: number, messageId: number, emoji: string): Promise<void> {

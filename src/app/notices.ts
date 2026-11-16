@@ -18,9 +18,10 @@ export class Notices {
   /** Перерисовать все сообщения вопроса по его состоянию; кнопки остаются для переигрывания. */
   async refreshQuestion(question: Question, session: Session): Promise<void> {
     const text = Messages.question(question, session);
+    const html = Messages.questionHtml(question, session);
     const buttons = Messages.questionButtons(question);
     for (const link of this.store.linksOfQuestion(question.id)) {
-      await this.bestEffort(() => this.telegram.edit(link.chatId, link.messageId, text, buttons));
+      await this.bestEffort(() => this.telegram.edit(link.chatId, link.messageId, text, buttons, html));
     }
   }
 

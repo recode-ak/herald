@@ -60,25 +60,21 @@ export class TelegramBotApi implements TelegramPort {
   }
 
   async send(message: OutgoingMessage): Promise<number> {
-    const result = (await this.call('sendMessage', {
+    const params = {
       chat_id: message.chatId,
-      text: message.text,
       ...(message.buttons && { reply_markup: TelegramBotApi.markup(message.buttons) }),
       ...(message.replyTo !== undefined && {
         reply_parameters: { message_id: message.replyTo, allow_sending_without_reply: true },
       }),
-    })) as RawMessage;
+    };
+    const result = (await this.withFallback('sendMessage', params, message.text, message.html)) as RawMessage;
     return result.message_id;
   }
 
-  async edit(chatId: number, messageId: number, text: string, buttons?: Keyboard): Promise<void> {
+  async edit(chatId: number, messageId: number, text: string, buttons?: Keyboard, html?: string): Promise<void> {
     try {
-      await this.call('editMessageText', {
-        chat_id: chatId,
-        message_id: messageId,
-        text,
-        reply_markup: TelegramBotApi.markup(buttons ?? []),
-      });
+      const params = { chat_id: chatId, message_id: messageId, reply_markup: TelegramBotApi.markup(buttons ?? []) };
+      await this.withFallback('editMessageText', params, text, html);
     } catch (error) {
       if (error instanceof TelegramError && error.message.includes('message is not modified')) return;
       throw error;
@@ -107,6 +103,22 @@ export class TelegramBotApi implements TelegramPort {
     const updates = raw.flatMap((u) => TelegramBotApi.update(u) ?? []);
     const last = raw.at(-1);
     return { updates, nextOffset: last ? last.update_id + 1 : offset };
+  }
+
+  /** С `html` — `parse_mode: HTML`; Telegram не разобрал разметку — тот же вызов обычным текстом. */
+  private async withFallback(
+    method: string,
+    params: Record<string, unknown>,
+    text: string,
+    html: string | undefined,
+  ): Promise<unknown> {
+    if (html === undefined) return this.call(method, { ...params, text });
+    try {
+      return await this.call(method, { ...params, text: html, parse_mode: 'HTML' });
+    } catch (error) {
+      if (!(error instanceof TelegramError && error.message.includes("can't parse entities"))) throw error;
+      return this.call(method, { ...params, text });
+    }
   }
 
   private async call(method: string, params: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {

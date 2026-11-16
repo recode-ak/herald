@@ -84,7 +84,7 @@ describe('Канал по stdio', () => {
 
   test('reply → сообщение в Telegram; reply человека → событие в сессию, «прочитано агентом»', async () => {
     await client.callTool({ name: 'reply', arguments: { text: 'Фаза 5 готова' } });
-    const notice = fake.sent.find((m) => m.params.text === '[laptop · claude]\nФаза 5 готова');
+    const notice = fake.sent.find((m) => FakeBotApi.plainText(m.params) === '[laptop · claude]\nФаза 5 готова');
     expect(notice).toBeDefined();
 
     fake.pushUpdate({
@@ -119,7 +119,7 @@ describe('Канал по stdio', () => {
     });
     const id = text(r).match(/q_[0-9a-z]+/)?.[0];
     expect(id).toBeString();
-    const question = fake.sent.findLast((m) => String(m.params.text).includes('Какую БД?'))!;
+    const question = fake.sent.findLast((m) => FakeBotApi.plainText(m.params).includes('Какую БД?'))!;
 
     fake.pushUpdate({
       callback_query: { id: 'cb1', data: `a:${id}:B`, message: { message_id: question.messageId, chat: { id: NUR } } },
