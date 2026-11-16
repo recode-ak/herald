@@ -85,7 +85,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: `docs/install.md` — подключение канала (`.mcp.json`, флаг запуска, ограничения research preview) (6c33a80)
 - [x] Task: Conductor - User Manual Verification 'Фаза 5: Channel для Claude Code' (3314886) (Protocol in workflow.md)
 
-## Фаза 6: Деплой и установка
+## Фаза 6: Деплой и установка [checkpoint: d3640e3]
 
 Критерии фазы: сервер работает на kalki-server за `https://herald.u7-hub.kz`; реальный бот проходит КП 1–7 (КП 6 — в живой сессии Claude Code); установка клиента — не больше 5 команд (КП 8). Выкатка и действия на сервере — с уведомлением и ожиданием подтверждения.
 
@@ -106,7 +106,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] КП 1, 2, 3, 4, 5 и неверный токен (КП 7) — CLI с ноутбука через `https://herald.u7-hub.kz`, ответы Нурболата в Telegram
     - [ ] Чужой chat_id (КП 7) — Нурболат проверит со второго аккаунта позже; до того — тест `human.test.ts`
     - [ ] КП 6 (канал в живой сессии Claude Code) — перенесён в Фазу 7, после подключения канала
-- [x] Task: Conductor - User Manual Verification 'Фаза 6: Деплой и установка' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 6: Деплой и установка' (d3640e3) (Protocol in workflow.md)
 
 ## Фаза 7: Перевод Автопилота и итог
 
