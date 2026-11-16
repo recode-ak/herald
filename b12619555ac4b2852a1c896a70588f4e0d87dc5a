@@ -1,0 +1,11 @@
+Отчёт о верификации — Фаза 4: CLI.
+Автотесты: CI=true bun run check — biome, tsc --noEmit, 227 pass / 0 fail; покрытие всех файлов 98.6% строк. У всех кодовых файлов фазы есть тесты.
+Критерии фазы: CLI-сценарии КП 1–5, 7 — сквозной test/e2e/cli.test.ts (процесс herald → HeraldServer → FakeBotApi); bun run link — src/cli/main.test.ts (временный HOME).
+План ручной проверки (Автопилот — считается пройденной):
+1. Сервер локально: .env с тестовым ботом, bun src/server/main.ts.
+2. HERALD_URL=http://127.0.0.1:4518 HERALD_TOKEN=<t> bun run link && herald notify 'привет' → {"ok":true}, в Telegram «[host · herald] привет».
+3. herald ask 'БД?' -o 'A: SQLite' -o 'B: PG' --recommended A → нажать B → {"status":"answered","option":"B",...}, код 0.
+4. herald ask 'Ждёшь?' -o 'A: да' --timeout 5 → через 5 с {"status":"timeout"}, echo $? → 2; herald decide <id> A --reason 'по таймауту' → сообщение обновлено.
+5. reply на уведомление → «📥 в ящике сессии herald»; herald inbox --ack → указание, в Telegram «✅ прочитано агентом».
+Реальный бот — в смоуке Фазы 6.
+Подтверждение: Автопилот (ручная проверка считается пройденной).
