@@ -24,7 +24,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: `docs/model.md` — сущности, состояния, правила (9d59612)
 - [x] Task: Conductor - User Manual Verification 'Фаза 1: Каркас и домен' (07cabfe) (Protocol in workflow.md)
 
-## Фаза 2: Хранилище и сценарии
+## Фаза 2: Хранилище и сценарии [checkpoint: 0812373]
 
 Критерии фазы: все сценарии spec (ФТ 1–8, 10) работают на SQLite в памяти и фейковом Telegram; доступ по человеку проверен тестами.
 
@@ -42,7 +42,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Ожидание (long poll) (67965f2)
     - [x] Тесты: ожидание ответа на вопрос и новых входящих с таймаутом; пробуждение при событии; часы — за интерфейсом
     - [x] Реализация
-- [ ] Task: Conductor - User Manual Verification 'Фаза 2: Хранилище и сценарии' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 2: Хранилище и сценарии' (0812373) (Protocol in workflow.md)
 
 ## Фаза 3: HTTP-сервер и Telegram-адаптер
 
