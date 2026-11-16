@@ -30,9 +30,10 @@ export interface PiBridgeOptions {
 /**
  * Мост herald ↔ сессия pi: цикл long poll входящих (он же пульс сессии) → сообщение или команда агенту →
  * подтверждение прочтения. Ответы на вопросы не берёт: их ждёт сам `herald ask`, иначе агент получил бы их дважды.
+ * Перевод в терминал берёт: агент мог не ждать вопроса (`herald ask` его отмечает прочитанным, если ждал).
  */
 export class PiBridge {
-  static readonly KINDS: readonly InboxKind[] = ['directive', 'late-answer', 'command'];
+  static readonly KINDS: readonly InboxKind[] = ['directive', 'late-answer', 'command', 'to-terminal'];
 
   private running = false;
   private loop: Promise<void> | undefined;
@@ -112,6 +113,10 @@ export class PiBridge {
   }
 
   private static text(item: InboxItemWire): string {
+    if (item.kind === 'to-terminal') {
+      const id = item.questionId;
+      return `${item.text} (herald)\n\nСпроси здесь, в терминале; ответы закрой \`herald answered ${id} --answers '[…]'\` (одиночный — \`herald answered ${id} <вариант>\`).`;
+    }
     if (item.kind === 'late-answer') {
       return `Переигрывание вопроса ${item.questionId} (herald): человек ответил «${item.text}» уже после твоего решения по таймауту. Реши, нужно ли переделать.`;
     }

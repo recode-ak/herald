@@ -47,7 +47,7 @@ describe('PiBridge — входящие', () => {
     const { herald, bridge, until } = setup();
     bridge.start();
     await until(() => herald.polls > 0);
-    expect(herald.lastKinds).toEqual(['directive', 'late-answer', 'command']);
+    expect(herald.lastKinds).toEqual(['directive', 'late-answer', 'command', 'to-terminal']);
   });
 
   test('указание и поздний ответ → сообщение агенту от человека; затем подтверждение прочтения', async () => {
@@ -63,6 +63,18 @@ describe('PiBridge — входящие', () => {
       'Переигрывание вопроса q_1 (herald): человек ответил «B: Postgres» уже после твоего решения по таймауту. Реши, нужно ли переделать.',
     ]);
     expect(herald.acked).toEqual(['i1', 'i2']);
+  });
+
+  test('перевод в терминал → сообщение агенту: что спросить и как закрыть', async () => {
+    const { herald, agent, bridge, until } = setup();
+    bridge.start();
+    herald.push(
+      item({ id: 'i1', kind: 'to-terminal', text: 'Человек перевёл вопрос q_1 в терминал…', questionId: 'q_1' }),
+    );
+    await until(() => herald.acked.length === 1);
+    expect(agent.said).toEqual([
+      "Человек перевёл вопрос q_1 в терминал… (herald)\n\nСпроси здесь, в терминале; ответы закрой `herald answered q_1 --answers '[…]'` (одиночный — `herald answered q_1 <вариант>`).",
+    ]);
   });
 
   test('команда → агенту командой, не сообщением; прочтение подтверждается', async () => {

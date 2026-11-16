@@ -303,6 +303,13 @@ describe('Пачка вопросов и перевод в терминал', ()
     );
     expect(((await k.call('/v1/inbox', { session })).json.items as InboxItemWire[]).length).toBe(0);
 
+    const fourth = ((await k.call('/v1/ask', { session, ...db })).json.question as QuestionWire).id;
+    const awaiting = k.call('/v1/question', { session, id: fourth, waitMs: 10_000 });
+    await k.sleeping();
+    await k.press(k.telegram.last(NUR_CHAT)!.messageId, `t:${fourth}`);
+    expect(((await awaiting).json.question as QuestionWire).terminalAt).toBeDefined();
+    expect(((await k.call('/v1/inbox', { session })).json.items as InboxItemWire[]).length).toBe(0);
+
     const third = ((await k.call('/v1/ask', { session, ...db })).json.question as QuestionWire).id;
     const one = await k.call('/v1/to-terminal', { session, id: third });
     expect((one.json.questions as QuestionWire[]).map((q) => q.id)).toEqual([third]);
