@@ -1,0 +1,4 @@
+Задача: Точка входа сервера, Фаза 3.
+Сделано: ServerConfig.fromEnv (src/server/config.ts) — HERALD_TOKENS/PEOPLE/BOT_TOKEN обязательны, PORT 4518, HOSTNAME 127.0.0.1, DB ./data/herald.db, ACTIVE_HOURS 24, MAX_WAIT_SECONDS 50 (≤240), TELEGRAM_API; ошибки — ConfigError с именем переменной. HeraldServer (herald-server.ts) — сборка: SQLite (каталог создаётся), TelegramBotApi, Waiter, AgentService, HumanService, HttpApi, TelegramPoller; stop(): опрос → HTTP (обрыв long poll) → база. main.ts — старт из process.env (.env читает Bun), ConfigError → код 1, SIGINT/SIGTERM → stop, код 0. Тесты: конфиг, сквозной ask → кнопка в фейковом Bot API → ответ в ждущем запросе, offset после перезапуска, быстрая остановка, процесс main (код 1 / SIGTERM → 0).
+Документы: docs/model.md — разделы «HTTP API» и «Сервер»; AGENTS.md — слой src/server.
+Решение (тактическое): порт по умолчанию 4518 (chronicle — 4517); на kalki-server проверить в Фазе 6.
