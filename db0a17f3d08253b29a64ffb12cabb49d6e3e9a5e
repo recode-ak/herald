@@ -1,0 +1,6 @@
+Задача: Сценарии человека (Фаза 2).
+- src/app/human.ts — HumanService.handle(update): кнопка варианта → answer/late-answer; «Жди меня» → hold; reply на вопрос → свободный ответ; reply на любое сообщение сессии (в т. ч. на отметку) → directive; /sessions — активные сессии с давностью и статусом, кнопки выбора (callback s:<хеш ключа>, ≤ 64 байт) → следующий текст — указание выбранной сессии (один раз); /status — статусы активных или одной сессии (reply); прочее — подсказка «Кому?». Чужой chat_id — молча игнорируется (callback закрывается без текста); чужой вопрос/сессия — «⛔».
+- src/app/notices.ts — Notices: перерисовка вопроса, отметки «в ящике» / «прочитано агентом» (best effort); AgentService переведён на него.
+- src/app/messages.ts — строки /sessions и /status, давность, текст ответа.
+- Store/SqliteStore: chatTarget/setChatTarget (kv target:<chat_id>), тест.
+- src/app/human.test.ts — 20 тестов.
