@@ -15,6 +15,8 @@ interface ScriptedFailure {
  */
 export class FakeBotApi {
   readonly calls: BotApiCall[] = [];
+  /** Успешно отправленные сообщения с назначенным message_id. */
+  readonly sent: { messageId: number; params: Record<string, unknown> }[] = [];
   private readonly updates: { update_id: number; [key: string]: unknown }[] = [];
   private readonly failures = new Map<string, ScriptedFailure[]>();
   private readonly pollers = new Set<() => void>();
@@ -67,8 +69,11 @@ export class FakeBotApi {
     switch (method) {
       case 'getUpdates':
         return FakeBotApi.ok(await this.getUpdates(params, req.signal));
-      case 'sendMessage':
-        return FakeBotApi.ok({ message_id: this.nextMessageId++, chat: { id: params.chat_id }, text: params.text });
+      case 'sendMessage': {
+        const messageId = this.nextMessageId++;
+        this.sent.push({ messageId, params });
+        return FakeBotApi.ok({ message_id: messageId, chat: { id: params.chat_id }, text: params.text });
+      }
       case 'editMessageText':
       case 'answerCallbackQuery':
         return FakeBotApi.ok(true);

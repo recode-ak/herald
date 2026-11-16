@@ -31,6 +31,10 @@ describe('FakeBotApi', () => {
       { chat_id: 1, text: 'a' },
       { chat_id: 1, text: 'b' },
     ]);
+    expect(fake.sent.map((m) => [m.messageId, m.params.text])).toEqual([
+      [1, 'a'],
+      [2, 'b'],
+    ]);
   });
 
   test('getUpdates: по offset, подтверждённые удаляются', async () => {
