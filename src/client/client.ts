@@ -68,6 +68,11 @@ export class HeraldClient {
     return ((await this.call('/v1/ask', { ...request })) as { question: QuestionWire }).question;
   }
 
+  /** Человек ответил в терминале агента: закрыть вопрос его ответом. */
+  async answered(id: string, choice: Choice): Promise<QuestionWire> {
+    return ((await this.call('/v1/answered', { id, ...choice })) as { question: QuestionWire }).question;
+  }
+
   async decide(id: string, choice: Choice, reason: string): Promise<QuestionWire> {
     return ((await this.call('/v1/decide', { id, ...choice, reason })) as { question: QuestionWire }).question;
   }

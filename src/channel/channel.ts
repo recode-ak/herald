@@ -14,6 +14,7 @@ export interface ChannelHerald {
   bye(): Promise<void>;
   ask(request: AskRequest): Promise<QuestionWire>;
   decide(id: string, choice: Choice, reason: string): Promise<QuestionWire>;
+  answered(id: string, choice: Choice): Promise<QuestionWire>;
   inbox(waitMs?: number, kinds?: readonly InboxKind[]): Promise<InboxItemWire[]>;
   ack(ids: readonly string[]): Promise<string[]>;
 }
@@ -83,7 +84,7 @@ const EVENTS_INSTRUCTIONS = [
   '- kind="answer" question_id="..." — ответ на твой вопрос (option — id выбранного варианта).',
   '- kind="late-answer" question_id="..." — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
   '',
-  'ask задаёт вопрос с вариантами и сразу возвращает id — не жди, продолжай работу; ответ придёт событием. С timeout_seconds: если к сроку ответа нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). Без timeout_seconds решать нельзя — жди ответа.',
+  'ask задаёт вопрос с вариантами и сразу возвращает id — не жди, продолжай работу; ответ придёт событием. С timeout_seconds: если к сроку ответа нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). Без timeout_seconds решать нельзя — жди ответа. Человек ответил в терминале — закрой вопрос инструментом answered.',
   ...STATUS_AND_TITLE,
 ].join('\n');
 
@@ -95,7 +96,7 @@ const PULL_INSTRUCTIONS = [
   '- kind=answer question_id=... — ответ на твой вопрос (option — id выбранного варианта).',
   '- kind=late-answer question_id=... — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
   '',
-  'ask задаёт вопрос с вариантами и сразу возвращает id; ответ забери инструментом inbox. С timeout_seconds: если к сроку ответа нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). Без timeout_seconds решать нельзя — жди ответа.',
+  'ask задаёт вопрос с вариантами и сразу возвращает id; ответ забери инструментом inbox. С timeout_seconds: если к сроку ответа нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). Без timeout_seconds решать нельзя — жди ответа. Человек ответил в терминале — закрой вопрос инструментом answered.',
   ...STATUS_AND_TITLE,
 ].join('\n');
 
@@ -153,6 +154,20 @@ const TOOLS = [
         reason: { type: 'string', description: 'почему, например «по таймауту»' },
       },
       required: ['question_id', 'reason'],
+    },
+  },
+  {
+    name: 'answered',
+    description:
+      'Человек ответил на вопрос в терминале, а не в Telegram: закрыть вопрос его ответом. Сообщение в Telegram обновится, кнопки уберутся.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        question_id: { type: 'string' },
+        option: { type: 'string', description: 'id выбранного варианта' },
+        text: { type: 'string', description: 'свободный ответ вместо варианта' },
+      },
+      required: ['question_id'],
     },
   },
   {
@@ -405,11 +420,15 @@ export class HeraldChannel {
               : `вопрос ${question.id} задан; ответ забери инструментом inbox (kind=answer question_id=${question.id})`,
           );
         }
+        case 'answered': {
+          const question = await this.herald.answered(
+            HeraldChannel.string(args, 'question_id'),
+            HeraldChannel.choice(args),
+          );
+          return HeraldChannel.ok(`вопрос ${question.id} закрыт ответом из терминала`);
+        }
         case 'decide': {
-          const option = HeraldChannel.optionalString(args, 'option');
-          const text = HeraldChannel.optionalString(args, 'text');
-          if ((option === undefined) === (text === undefined)) throw new ToolArgsError('нужен option или text');
-          const choice: Choice = option !== undefined ? { option } : { text: text as string };
+          const choice = HeraldChannel.choice(args);
           const question = await this.herald.decide(
             HeraldChannel.string(args, 'question_id'),
             choice,
@@ -437,6 +456,14 @@ export class HeraldChannel {
     const value = args[name];
     if (typeof value !== 'string') throw new ToolArgsError(`аргумент «${name}» — ожидается строка`);
     return value;
+  }
+
+  /** `option` или `text` — ровно одно из них. */
+  private static choice(args: Record<string, unknown>): Choice {
+    const option = HeraldChannel.optionalString(args, 'option');
+    const text = HeraldChannel.optionalString(args, 'text');
+    if ((option === undefined) === (text === undefined)) throw new ToolArgsError('нужен option или text');
+    return option !== undefined ? { option } : { text: text as string };
   }
 
   private static optionalString(args: Record<string, unknown>, name: string): string | undefined {

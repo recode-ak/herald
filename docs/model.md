@@ -41,9 +41,10 @@
 
 - `answer` — вариант или свободный текст. Если вопрос не `open`, ответ **поздний**: сохраняется в `lateAnswers`, первое решение не меняется (агент сам решает, переигрывать ли).
 - `decide` — только из `open`, только у вопроса с таймаутом и без удержания; причина обязательна («по таймауту»). Вопрос без таймаута решает только человек.
+- `answerInTerminal` — человек ответил в терминале агента, отмечает агент (`answered`): `open → answered`, `resolution.via = terminal`; из другого состояния — ошибка (поздним не бывает). Во входящие не попадает.
 - `hold` — кнопка «Жди меня»: вопрос остаётся `open`, агенту решать нельзя, человек ответит сам.
 - Таймаут — целое мс ≥ 0 (`0` — агент решит сразу). Сам срок сервер не отслеживает: решает агент, сервер лишь разрешает или запрещает `decide`.
-- `resolution` — `{ by: human | agent, option | text, reason?, at }`.
+- `resolution` — `{ by: human | agent, option | text, reason?, via?, at }`.
 
 ## Входящие (`inbox.ts`)
 
@@ -103,6 +104,7 @@ Long poll без опроса базы: сценарии человека буд
 | `/v1/ask` | `text`, `options?: [{ id, text }]`, `recommended?`, `timeoutMs?` | `{ question }` |
 | `/v1/question` | `id`, `waitMs?` | `{ question }` — после ответа или по истечении `waitMs` (тогда `status: open`) |
 | `/v1/decide` | `id`, `option` или `text`, `reason` | `{ question }`; вопрос без таймаута — 400 |
+| `/v1/answered` | `id`, `option` или `text` | `{ question }`: человек ответил в терминале, сообщение — «👤 Принят A (в терминале)», без кнопок |
 | `/v1/status` | `text` | `{ ok: true }` |
 | `/v1/title` | `text` | `{ ok: true }` — название сессии |
 | `/v1/bye` | — | `{ ok: true }` — окно закрыто, сессия ⚪ |
@@ -143,6 +145,7 @@ Telegram опрашивается long polling `getUpdates` (25 с); offset хр
 | `herald title <текст>` | `{ ok: true }` — название сессии в шапке |
 | `herald ask <вопрос> [-o "A: текст"]… [--recommended A] [--timeout <с>]` | `{ id, status, by?, option?, text?, reason? }`; `--timeout` уходит на сервер сроком вопроса; без него ждёт бесконечно, `decide` по вопросу запрещён |
 | `herald decide <id> (<вариант> \| --text <текст>) --reason <причина>` | то же, `status: decided` |
+| `herald answered <id> (<вариант> \| --text <текст>)` | то же, `status: answered` — человек ответил в терминале |
 | `herald inbox [--wait <с>] [--ack]` | `[{ id, kind, text, questionId?, option?, createdAt }]`; `--ack` — сразу подтвердить выданное |
 | `herald ack <id>…` | `{ read: [id…] }` |
 
@@ -164,6 +167,7 @@ MCP-сервер по stdio для Claude Code — тонкий слой над 
 | `reply`, `notify` | `text` | уведомление человеку |
 | `ask` | `text`, `options?: [{ id, text }]`, `recommended?`, `timeout_seconds?` | сразу id вопроса; ответ — событием (без событий — через `inbox`). Без `timeout_seconds` `decide` запрещён |
 | `decide` | `question_id`, `option` или `text`, `reason` | решение агента |
+| `answered` | `question_id`, `option` или `text` | человек ответил в терминале: вопрос закрыт |
 | `status` | `text` | статус сессии (в Telegram не отправляется) |
 | `title` | `text` | название сессии в шапке; инструкция канала просит задать его в начале работы |
 | `inbox` | `wait_seconds?` (до 600) | только без событий: непрочитанные `directive`, `answer`, `late-answer` текстом (`kind=… item_id=… question_id=… option=…`, ниже — `content` как в событии), затем `ack`; пусто — ждёт до `wait_seconds` |

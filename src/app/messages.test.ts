@@ -121,6 +121,13 @@ describe('Messages — срок вопроса и «Жди меня»', () => {
     expect(labels(q)).toEqual(['A ⭐']);
   });
 
+  test('ответ в терминале — пометка, кнопок нет', () => {
+    const q = Question.ask({ ...draft, timeoutMs: 180_000 }, 0);
+    q.answerInTerminal({ option: 'A' }, 1);
+    expect(Messages.question(q, session, ZONE)).toEndWith('\n\n👤 Принят A (в терминале).');
+    expect(labels(q)).toEqual([]);
+  });
+
   test('решённый вопрос — без срока', () => {
     const q = Question.ask({ ...draft, timeoutMs: 180_000 }, 0);
     q.decide({ option: 'A' }, 'по таймауту', 180_000);

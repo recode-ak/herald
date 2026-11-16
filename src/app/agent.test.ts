@@ -123,6 +123,31 @@ describe('AgentService.ask', () => {
   });
 });
 
+describe('AgentService.answered', () => {
+  test('ответ человека в терминале: вопрос закрыт, сообщение обновлено без кнопок, во входящих ничего', async () => {
+    const { agent, telegram, store } = setup();
+    const { timeoutMs: _, ...untimed } = db;
+    const q = await agent.ask(nur, untimed);
+    const before = telegram.last(NUR_CHAT)!;
+
+    const answered = await agent.answered(nur, q.id, { option: 'B' });
+    expect(answered.resolution).toMatchObject({ by: 'human', option: 'B', via: 'terminal' });
+    expect(store.question(q.id)?.status).toBe('answered');
+    const after = telegram.message(NUR_CHAT, before.messageId)!;
+    expect(after.text).toEndWith('\n\n👤 Принят B (в терминале).');
+    expect(after.buttons).toEqual([]);
+    expect(await agent.inbox(nur)).toEqual([]);
+  });
+
+  test('чужой вопрос — ForbiddenError; уже решённый — DomainError', async () => {
+    const { agent } = setup();
+    const q = await agent.ask(nur, db);
+    await expect(agent.answered(ann, q.id, { option: 'A' })).rejects.toBeInstanceOf(ForbiddenError);
+    await agent.decide(nur, q.id, { option: 'A' }, 'по таймауту');
+    await expect(agent.answered(nur, q.id, { option: 'B' })).rejects.toBeInstanceOf(DomainError);
+  });
+});
+
 describe('AgentService.decide', () => {
   test('решение по таймауту: сообщение обновляется, кнопки вариантов остаются, «Жди меня» — нет', async () => {
     const { agent, telegram, store } = setup();

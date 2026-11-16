@@ -42,7 +42,7 @@ herald notify "herald подключён"               # проверка: со
 
 ## Канал для Claude Code
 
-Канал — MCP-сервер `src/channel/main.ts` (stdio) с capability `claude/channel`: сообщения из Telegram приходят прямо в сессию, у агента есть инструменты `reply`/`notify`, `ask`, `decide`, `status`. Настройки — те же, что у CLI (`~/.config/herald/config.json`).
+Канал — MCP-сервер `src/channel/main.ts` (stdio) с capability `claude/channel`: сообщения из Telegram приходят прямо в сессию, у агента есть инструменты `reply`/`notify`, `ask`, `decide`, `answered`, `status`. Настройки — те же, что у CLI (`~/.config/herald/config.json`).
 
 **1. Зарегистрировать MCP-сервер** — для всех проектов (`~/.claude.json`):
 
@@ -81,7 +81,7 @@ claude() {
 
 С флагом Claude Code при каждом запуске спрашивает подтверждение dev-канала — один Enter. Включить канал в настройках нельзя: только флагом (2.1.325).
 
-**3. Разрешить инструменты без вопросов** (по желанию) — в `permissions.allow` настроек Claude Code: `mcp__herald__reply`, `mcp__herald__notify`, `mcp__herald__ask`, `mcp__herald__decide`, `mcp__herald__status`, `mcp__herald__title`, `mcp__herald__inbox`.
+**3. Разрешить инструменты без вопросов** (по желанию) — в `permissions.allow` настроек Claude Code: `mcp__herald__reply`, `mcp__herald__notify`, `mcp__herald__ask`, `mcp__herald__decide`, `mcp__herald__answered`, `mcp__herald__status`, `mcp__herald__title`, `mcp__herald__inbox`.
 
 ### Переменные окружения канала
 

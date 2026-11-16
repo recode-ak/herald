@@ -34,6 +34,8 @@ const USAGE = `herald — вопросы и уведомления челове�
                                                 и decide по нему запрещён)
   herald decide <id> (<вариант> | --text <текст>) --reason <причина>
                                                 решение агента (например, по таймауту)
+  herald answered <id> (<вариант> | --text <текст>)
+                                                человек ответил в терминале: закрыть вопрос
   herald inbox [--wait <с>] [--ack]             входящие: ответы, поздние ответы, указания
   herald ack <id>…                              подтвердить прочтение входящих
 
@@ -66,6 +68,8 @@ export class Cli {
           return await this.ask(rest);
         case 'decide':
           return await this.decide(rest);
+        case 'answered':
+          return await this.answered(rest);
         case 'inbox':
           return await this.inbox(rest);
         case 'ack':
@@ -132,6 +136,17 @@ export class Cli {
     if (!reason?.trim()) throw new UsageError('decide: нужна --reason');
     const choice: Choice = option !== undefined ? { option } : { text: text as string };
     return this.print(Cli.result(await this.client(args).decide(id, choice, reason)));
+  }
+
+  private async answered(argv: readonly string[]): Promise<number> {
+    const args = this.parse(argv, { values: ['text'] });
+    const [id, option, ...extra] = args.positional;
+    if (!id) throw new UsageError('answered: нужен id вопроса');
+    if (extra.length > 0) throw new UsageError('answered: лишние аргументы');
+    const text = args.value('text');
+    if ((option === undefined) === (text === undefined)) throw new UsageError('answered: нужен вариант или --text');
+    const choice: Choice = option !== undefined ? { option } : { text: text as string };
+    return this.print(Cli.result(await this.client(args).answered(id, choice)));
   }
 
   private async inbox(argv: readonly string[]): Promise<number> {

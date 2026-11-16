@@ -129,6 +129,31 @@ describe('Question — решение агента', () => {
   });
 });
 
+describe('Question — ответ в терминале', () => {
+  test('агент отмечает ответ человека в терминале: open → answered, via terminal', () => {
+    const q = Question.ask({ ...draft, timeoutMs: undefined }, t0);
+    q.answerInTerminal({ option: 'B' }, t0 + 1);
+    expect(q.status).toBe('answered');
+    expect(q.resolution).toEqual({ by: 'human', option: 'B', via: 'terminal', at: t0 + 1 });
+  });
+
+  test('и после «Жди меня»; свободный текст', () => {
+    const q = Question.ask(draft, t0);
+    q.hold(t0 + 1);
+    q.answerInTerminal({ text: ' позже ' }, t0 + 2);
+    expect(q.resolution).toEqual({ by: 'human', text: 'позже', via: 'terminal', at: t0 + 2 });
+  });
+
+  test('только открытый вопрос и только известный вариант', () => {
+    const q = Question.ask(draft, t0);
+    expect(() => q.answerInTerminal({ option: 'C' }, t0)).toThrow(DomainError);
+    q.answer({ option: 'A' }, t0 + 1);
+    expect(() => q.answerInTerminal({ option: 'B' }, t0 + 2)).toThrow('уже решён');
+    expect(q.resolution?.option).toBe('A');
+    expect(q.lateAnswers).toEqual([]);
+  });
+});
+
 describe('Question — «Жди меня»', () => {
   test('удержание: вопрос открыт, решать агенту нельзя', () => {
     const q = Question.ask(draft, t0);

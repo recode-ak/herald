@@ -75,6 +75,7 @@ describe('Канал по stdio', () => {
   test('capability claude/channel и инструменты', async () => {
     expect(client.getServerCapabilities()?.experimental?.['claude/channel']).toEqual({});
     expect((await client.listTools()).tools.map((t) => t.name).sort()).toEqual([
+      'answered',
       'ask',
       'decide',
       'notify',

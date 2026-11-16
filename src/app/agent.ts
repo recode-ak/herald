@@ -76,6 +76,20 @@ export class AgentService {
     return question;
   }
 
+  /**
+   * Человек ответил в терминале агента: вопрос закрыт его ответом, сообщение перерисовано без кнопок.
+   * Во входящие ответ не попадает — агент его уже знает.
+   */
+  async answered(caller: Caller, questionId: string, choice: Choice): Promise<Question> {
+    const session = this.enter(caller);
+    const question = this.ownQuestion(caller, questionId);
+    question.answerInTerminal(choice, this.deps.clock.now());
+    this.deps.store.saveQuestion(question);
+    this.deps.waiter.notify(Waiter.questionTopic(questionId));
+    await this.notices.refreshQuestion(question, session);
+    return question;
+  }
+
   /** Решение агента (по таймауту; вопрос без таймаута решает только человек). Сообщение вопроса обновляется, кнопки остаются для переигрывания. */
   async decide(caller: Caller, questionId: string, choice: Choice, reason: string): Promise<Question> {
     const session = this.enter(caller);

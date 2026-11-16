@@ -78,7 +78,7 @@ export class Messages {
       const replay = Messages.humanAnswered(question) ? '' : ' Кнопки — чтобы переиграть.';
       text += `\n\n🤖 ${style.plain(`${Messages.choice(r)}${r.reason ? ` ${r.reason}` : ''}`)}.${replay}`;
     } else if (r?.by === 'human') {
-      text += `\n\n👤 ${style.plain(Messages.choice(r))}.`;
+      text += `\n\n👤 ${style.plain(Messages.choice(r))}${r.via === 'terminal' ? ' (в терминале)' : ''}.`;
     }
     for (const late of question.lateAnswers) text += `\n🔁 Переигрывание: ${style.plain(Messages.choice(late))}.`;
     return text;

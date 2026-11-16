@@ -208,6 +208,20 @@ describe('Вопрос', () => {
     }
   });
 
+  test('answered — ответ человека в терминале; без варианта и текста — 400', async () => {
+    const k = setup();
+    const { timeoutMs: _, ...untimed } = db;
+    const id = ((await k.call('/v1/ask', { session, ...untimed })).json.question as QuestionWire).id;
+    expect((await k.call('/v1/answered', { session, id })).status).toBe(400);
+    const res = await k.call('/v1/answered', { session, id, option: 'B' });
+    expect(res.status).toBe(200);
+    expect(res.json.question as QuestionWire).toMatchObject({
+      status: 'answered',
+      resolution: { by: 'human', option: 'B', via: 'terminal' },
+    });
+    expect(k.telegram.edits.at(-1)?.text).toContain('(в терминале)');
+  });
+
   test('decide без варианта и текста — 400', async () => {
     const k = setup();
     const id = ((await k.call('/v1/ask', { session, ...db })).json.question as QuestionWire).id;

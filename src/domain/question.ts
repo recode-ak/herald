@@ -15,6 +15,8 @@ export interface Resolution {
   text?: string;
   /** Причина решения агента («по таймауту»). */
   reason?: string;
+  /** Где ответил человек: `terminal` — в терминале агента (отметил агент); нет — в Telegram. */
+  via?: 'terminal';
   at: number;
 }
 
@@ -128,6 +130,13 @@ export class Question {
     this.state.resolution = resolution;
     this.state.status = 'answered';
     return 'answer';
+  }
+
+  /** Человек ответил в терминале агента — отмечает агент. Только из `open`: поздним такой ответ не бывает. */
+  answerInTerminal(choice: Choice, now: number): void {
+    if (this.state.status !== 'open') throw new DomainError(`вопрос ${this.id} уже решён`);
+    this.state.resolution = { by: 'human', ...this.validate(choice), via: 'terminal', at: now };
+    this.state.status = 'answered';
   }
 
   /** Решение агента без ответа человека (например, по таймауту). */

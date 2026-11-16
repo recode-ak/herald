@@ -65,6 +65,10 @@ export class HttpApi {
           question: Wire.question(await agent.decide(c, b.string('id'), HttpApi.choice(b), b.string('reason'))),
         }),
       ],
+      [
+        '/v1/answered',
+        async (c, b) => ({ question: Wire.question(await agent.answered(c, b.string('id'), HttpApi.choice(b))) }),
+      ],
       ['/v1/status', (c, b) => agent.status(c, b.string('text'))],
       ['/v1/title', (c, b) => agent.title(c, b.string('text'))],
       ['/v1/bye', (c) => agent.bye(c)],

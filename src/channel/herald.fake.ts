@@ -12,6 +12,7 @@ export class FakeHerald implements ChannelHerald {
   byes = 0;
   readonly asked: AskRequest[] = [];
   readonly decided: { id: string; choice: Choice; reason: string }[] = [];
+  readonly answeredInTerminal: { id: string; choice: Choice }[] = [];
   readonly acked: string[] = [];
   /** Сколько раз спрашивали входящие. */
   polls = 0;
@@ -66,6 +67,12 @@ export class FakeHerald implements ChannelHerald {
       askedAt: 0,
       lateAnswers: [],
     };
+  }
+
+  async answered(id: string, choice: Choice): Promise<QuestionWire> {
+    this.maybeFail();
+    this.answeredInTerminal.push({ id, choice });
+    return { id, text: '', options: [], status: 'answered', askedAt: 0, lateAnswers: [] };
   }
 
   async decide(id: string, choice: Choice, reason: string): Promise<QuestionWire> {

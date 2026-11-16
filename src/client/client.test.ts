@@ -85,6 +85,8 @@ describe('HeraldClient', () => {
     expect(q).toMatchObject({ status: 'open', deadlineAt: q.askedAt + 180_000 });
     const decided = await c.decide(q.id, { option: 'A' }, 'по таймауту');
     expect(decided.resolution).toMatchObject({ by: 'agent', option: 'A' });
+    const other = await c.ask({ text: 'Имя?', options: [] });
+    expect((await c.answered(other.id, { text: 'herald' })).resolution).toMatchObject({ via: 'terminal' });
   });
 
   test('awaitQuestion переподключается, пока не придёт ответ', async () => {

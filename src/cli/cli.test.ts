@@ -219,6 +219,24 @@ describe('herald decide', () => {
   });
 });
 
+describe('herald answered', () => {
+  test('ответ человека в терминале — JSON как у ask, сообщение без кнопок', async () => {
+    const k = setup();
+    const id = (await k.run(['ask', 'БД?', '-o', 'A: SQLite', '-o', 'B: Postgres', '--timeout', '0'])).json.id;
+    const r = await k.run(['answered', id, 'B']);
+    expect(r).toMatchObject({ code: 0, json: { id, status: 'answered', by: 'human', option: 'B', text: 'Postgres' } });
+    expect(k.telegram.edits.at(-1)).toMatchObject({ buttons: [] });
+    expect(k.telegram.edits.at(-1)?.text).toContain('(в терминале)');
+  });
+
+  test('--text вместо варианта; без варианта и текста — код 1', async () => {
+    const k = setup();
+    const id = (await k.run(['ask', 'Имя?', '--timeout', '0'])).json.id;
+    expect((await k.run(['answered', id])).code).toBe(1);
+    expect((await k.run(['answered', id, '--text', 'herald'])).json).toMatchObject({ text: 'herald' });
+  });
+});
+
 describe('herald inbox / ack', () => {
   test('указание и поздний ответ; --ack подтверждает выданное', async () => {
     const k = setup();

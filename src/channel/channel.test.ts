@@ -55,7 +55,15 @@ describe('HeraldChannel — объявление', () => {
   test('инструменты: reply, notify, ask, decide, status', async () => {
     const { client } = await setup();
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['ask', 'decide', 'notify', 'reply', 'status', 'title']);
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      'answered',
+      'ask',
+      'decide',
+      'notify',
+      'reply',
+      'status',
+      'title',
+    ]);
     for (const t of tools) expect(t.description).toBeString();
   });
 });
@@ -136,6 +144,17 @@ describe('HeraldChannel — инструменты', () => {
     expect(herald.decided).toEqual([
       { id: 'q_7', choice: { option: 'A' }, reason: 'по таймауту' },
       { id: 'q_8', choice: { text: 'herald' }, reason: 'по таймауту' },
+    ]);
+  });
+
+  test('answered — вариант или текст: человек ответил в терминале', async () => {
+    const { herald, call } = await setup();
+    expect((await call('answered', { question_id: 'q_7', option: 'A' })).isError).toBe(false);
+    await call('answered', { question_id: 'q_8', text: 'herald' });
+    expect((await call('answered', { question_id: 'q_9' })).isError).toBe(true);
+    expect(herald.answeredInTerminal).toEqual([
+      { id: 'q_7', choice: { option: 'A' } },
+      { id: 'q_8', choice: { text: 'herald' } },
     ]);
   });
 
