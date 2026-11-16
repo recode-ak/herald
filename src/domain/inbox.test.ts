@@ -20,6 +20,13 @@ describe('InboxItem', () => {
     expect(() => InboxItem.create({ ...base, id: 'i2', kind: 'late-answer', text: 'B' }, t0)).toThrow(DomainError);
   });
 
+  test('перевод вопроса в терминал — с id вопроса; вид известен', () => {
+    const item = InboxItem.create({ ...base, id: 'i1', kind: 'to-terminal', text: 'спроси', questionId: 'q1' }, t0);
+    expect(item.questionId).toBe('q1');
+    expect(() => InboxItem.create({ ...base, id: 'i2', kind: 'to-terminal', text: 'x' }, t0)).toThrow(DomainError);
+    expect(InboxItem.kinds(['to-terminal'])).toEqual(['to-terminal']);
+  });
+
   test('команда терминала — только из списка: /clear, /compact', () => {
     const item = InboxItem.create({ ...base, id: 'i1', kind: 'command', text: '/compact' }, t0);
     expect(item.kind).toBe('command');

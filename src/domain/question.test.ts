@@ -183,3 +183,151 @@ test('состояние сохраняется и восстанавливае�
   q.answer({ text: 'нет, B' }, t0 + 2);
   expect(Question.restore(q.toState()).toState()).toEqual(q.toState());
 });
+
+const batch: QuestionDraft = {
+  id: 'q2',
+  sessionKey: 'h:/x',
+  person: 'nur',
+  items: [
+    {
+      text: 'База?',
+      options: [
+        { id: 'A', text: 'SQLite' },
+        { id: 'B', text: 'JSON' },
+      ],
+      recommended: 'A',
+    },
+    { text: 'Порт?', options: [], recommended: undefined },
+    {
+      text: 'Логи?',
+      options: [
+        { id: 'A', text: 'stderr' },
+        { id: 'B', text: 'файл' },
+      ],
+      recommended: 'B',
+    },
+  ],
+  timeoutMs: 180_000,
+};
+
+describe('Question — пачка пунктов', () => {
+  test('одиночный вопрос — пачка из одного пункта; плоские поля — первый пункт', () => {
+    const q = Question.ask(draft, t0);
+    expect(q.items).toHaveLength(1);
+    expect(q.items[0]).toEqual({
+      text: 'Хранить в SQLite?',
+      options: draft.options,
+      recommended: 'A',
+      lateAnswers: [],
+    });
+  });
+
+  test('пачка: 1–10 пунктов, каждый проверяется как одиночный вопрос', () => {
+    expect(Question.ask(batch, t0).items.map((i) => i.text)).toEqual(['База?', 'Порт?', 'Логи?']);
+    expect(() => Question.ask({ ...batch, items: [] }, t0)).toThrow('1–10');
+    const eleven = Array.from({ length: 11 }, (_, n) => ({ text: `${n}`, options: [] }));
+    expect(() => Question.ask({ ...batch, items: eleven }, t0)).toThrow('1–10');
+    expect(() => Question.ask({ ...batch, items: [{ text: 'x', options: [], recommended: 'A' }] }, t0)).toThrow(
+      'пункт 1',
+    );
+  });
+
+  test('ответы по пунктам: вопрос открыт, пока не отвечены все; текущий — первый неотвеченный', () => {
+    const q = Question.ask(batch, t0);
+    expect(q.current).toBe(1);
+    expect(q.answer({ option: 'B' }, t0 + 1, 1)).toBe('answer');
+    expect(q.status).toBe('open');
+    expect(q.current).toBe(2);
+    q.answer({ text: '4518' }, t0 + 2, 2);
+    q.answer({ option: 'A' }, t0 + 3, 3);
+    expect(q.status).toBe('answered');
+    expect(q.current).toBeUndefined();
+    expect(q.items.map((i) => i.resolution?.option ?? i.resolution?.text)).toEqual(['B', '4518', 'A']);
+  });
+
+  test('повторный ответ на пункт открытого вопроса заменяет прежний; несуществующий пункт — ошибка', () => {
+    const q = Question.ask(batch, t0);
+    q.answer({ option: 'A' }, t0 + 1, 1);
+    expect(q.answer({ option: 'B' }, t0 + 2, 1)).toBe('answer');
+    expect(q.items[0]?.resolution?.option).toBe('B');
+    expect(q.items[0]?.lateAnswers).toEqual([]);
+    expect(() => q.answer({ option: 'A' }, t0, 4)).toThrow('пункта 4 нет');
+    expect(() => q.answer({ text: 'x' }, t0, 0)).toThrow('пункта 0 нет');
+  });
+
+  test('ответ на пункт решённого вопроса — поздний этого пункта', () => {
+    const q = Question.ask(batch, t0);
+    q.decide([{ item: 2, choice: { text: '80' } }], 'по таймауту', t0 + 1);
+    expect(q.answer({ option: 'B' }, t0 + 2, 3)).toBe('late');
+    expect(q.items[2]?.resolution?.option).toBe('B');
+    expect(q.items[2]?.lateAnswers).toEqual([{ by: 'human', option: 'B', at: t0 + 2 }]);
+  });
+
+  test('decide: неотвеченные — ответ агента или рекомендованный; ответы человека остаются', () => {
+    const q = Question.ask(batch, t0);
+    q.answer({ option: 'B' }, t0 + 1, 1);
+    q.decide(
+      [
+        { item: 1, choice: { option: 'A' } },
+        { item: 2, choice: { text: '80' } },
+      ],
+      'по таймауту',
+      t0 + 2,
+    );
+    expect(q.status).toBe('decided');
+    expect(q.items.map((i) => i.resolution)).toEqual([
+      { by: 'human', option: 'B', at: t0 + 1 },
+      { by: 'agent', text: '80', reason: 'по таймауту', at: t0 + 2 },
+      { by: 'agent', option: 'B', reason: 'по таймауту', at: t0 + 2 },
+    ]);
+  });
+
+  test('decide: у неотвеченного пункта нет ни ответа агента, ни рекомендованного — ошибка с номером', () => {
+    const q = Question.ask(batch, t0);
+    expect(() => q.decide([], 'по таймауту', t0 + 1)).toThrow('пункт 2');
+    expect(q.status).toBe('open');
+    expect(q.items.every((i) => i.resolution === undefined)).toBe(true);
+  });
+
+  test('одиночный decide с вариантом — как прежде; без варианта — рекомендованный', () => {
+    const q = Question.ask(draft, t0);
+    q.decide([], 'по таймауту', t0 + 1);
+    expect(q.resolution).toEqual({ by: 'agent', option: 'A', reason: 'по таймауту', at: t0 + 1 });
+  });
+
+  test('ответ в терминале по пунктам: отвечены все — answered', () => {
+    const q = Question.ask(batch, t0);
+    q.answer({ option: 'A' }, t0 + 1, 1);
+    q.answerInTerminal([{ item: 2, choice: { text: '80' } }], t0 + 2);
+    expect(q.status).toBe('open');
+    q.answerInTerminal([{ item: 3, choice: { option: 'A' } }], t0 + 3);
+    expect(q.status).toBe('answered');
+    expect(q.items[2]?.resolution).toEqual({ by: 'human', option: 'A', via: 'terminal', at: t0 + 3 });
+  });
+});
+
+describe('Question — перевод в терминал', () => {
+  test('только открытый; повтор — без ошибки, время прежнее; решать агенту нельзя', () => {
+    const q = Question.ask(batch, t0);
+    q.moveToTerminal(t0 + 1);
+    q.moveToTerminal(t0 + 2);
+    expect(q.terminalAt).toBe(t0 + 1);
+    expect(q.status).toBe('open');
+    expect(() => q.decide([], 'по таймауту', t0 + 3)).toThrow('переведён в терминал');
+    q.answer({ option: 'A' }, t0 + 4, 1);
+    expect(q.items[0]?.resolution?.option).toBe('A');
+  });
+
+  test('решённый перевести нельзя', () => {
+    const q = Question.ask(draft, t0);
+    q.decide({ option: 'A' }, 'по таймауту', t0 + 1);
+    expect(() => q.moveToTerminal(t0 + 2)).toThrow('уже решён');
+  });
+
+  test('состояние пачки с переводом сохраняется и восстанавливается', () => {
+    const q = Question.ask(batch, t0);
+    q.answer({ option: 'B' }, t0 + 1, 1);
+    q.moveToTerminal(t0 + 2);
+    expect(Question.restore(q.toState()).toState()).toEqual(q.toState());
+  });
+});

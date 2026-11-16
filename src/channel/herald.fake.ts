@@ -66,19 +66,20 @@ export class FakeHerald implements ChannelHerald {
       status: 'open',
       askedAt: 0,
       lateAnswers: [],
+      items: [{ text: request.text, options: request.options, lateAnswers: [] }],
     };
   }
 
   async answered(id: string, choice: Choice): Promise<QuestionWire> {
     this.maybeFail();
     this.answeredInTerminal.push({ id, choice });
-    return { id, text: '', options: [], status: 'answered', askedAt: 0, lateAnswers: [] };
+    return { id, text: '', options: [], status: 'answered', askedAt: 0, lateAnswers: [], items: [] };
   }
 
   async decide(id: string, choice: Choice, reason: string): Promise<QuestionWire> {
     this.maybeFail();
     this.decided.push({ id, choice, reason });
-    return { id, text: '', options: [], status: 'decided', askedAt: 0, lateAnswers: [] };
+    return { id, text: '', options: [], status: 'decided', askedAt: 0, lateAnswers: [], items: [] };
   }
 
   /** Непрочитанные (`kinds` — только этих видов); если их нет — ждёт `push` не дольше 20 мс (короткий long poll). */

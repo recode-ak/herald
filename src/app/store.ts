@@ -12,6 +12,8 @@ export interface MessageLink {
   messageId: number;
   sessionKey: string;
   questionId?: string;
+  /** Пункт пачки, которому принадлежит сообщение вопроса (нет — первый). */
+  item?: number;
   inboxId?: string;
 }
 
@@ -42,6 +44,8 @@ export interface Store {
 
   question(id: string): Question | undefined;
   saveQuestion(question: Question): void;
+  /** Открытые вопросы сессии — по времени. */
+  openQuestions(sessionKey: string): Question[];
 
   saveInboxItem(item: InboxItem): void;
   /** Ящик сессии: непрочитанные и, сверх них, элементы `include` (чтобы подтвердить уже прочитанные). */

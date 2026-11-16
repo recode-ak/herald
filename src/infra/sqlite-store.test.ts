@@ -97,6 +97,84 @@ describe('SqliteStore: вопросы', () => {
   });
 });
 
+describe('SqliteStore: пачка вопросов (v6)', () => {
+  const batch = (id: string, sessionKey = Session.keyOf(ref), askedAt = 100) =>
+    Question.ask(
+      {
+        id,
+        sessionKey,
+        person: 'nur',
+        items: [
+          { text: 'БД?', options: [{ id: 'A', text: 'SQLite' }], recommended: 'A' },
+          { text: 'Порт?', options: [] },
+        ],
+        timeoutMs: 60_000,
+      },
+      askedAt,
+    );
+
+  test('пункты с ответами и перевод в терминал сохраняются', () => {
+    const store = SqliteStore.open(':memory:');
+    const q = batch('q1');
+    q.answer({ option: 'A' }, 200, 1);
+    q.moveToTerminal(300);
+    store.saveQuestion(q);
+    expect(store.question('q1')?.toState()).toEqual(q.toState());
+  });
+
+  test('открытые вопросы сессии — по времени; решённые и чужие не попадают', () => {
+    const store = SqliteStore.open(':memory:');
+    store.saveQuestion(batch('q2', Session.keyOf(ref), 300));
+    store.saveQuestion(batch('q1', Session.keyOf(ref), 200));
+    const done = batch('q3');
+    done.decide([{ item: 2, choice: { text: '80' } }], 'по таймауту', 400);
+    store.saveQuestion(done);
+    store.saveQuestion(batch('q4', 'другая'));
+    expect(store.openQuestions(Session.keyOf(ref)).map((q) => q.id)).toEqual(['q1', 'q2']);
+  });
+
+  test('связь сообщения с пунктом; без пункта — как раньше', () => {
+    const store = SqliteStore.open(':memory:');
+    store.saveLink({ chatId: 111, messageId: 1, sessionKey: 's', questionId: 'q1', item: 2 });
+    store.saveLink({ chatId: 111, messageId: 2, sessionKey: 's', questionId: 'q1' });
+    expect(store.link(111, 1)?.item).toBe(2);
+    expect(store.link(111, 2)).toEqual({ chatId: 111, messageId: 2, sessionKey: 's', questionId: 'q1' });
+  });
+
+  test('миграция с v5: старый вопрос — пачка из одного пункта со всем состоянием', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'herald-mig-'));
+    const path = join(dir, 'v5.db');
+    SqliteStore.open(path).close();
+    const raw = new Database(path);
+    raw.run('DROP INDEX questions_open');
+    raw.run(`ALTER TABLE questions DROP COLUMN items`);
+    raw.run(`ALTER TABLE questions DROP COLUMN terminal_at`);
+    raw.run(`ALTER TABLE message_links DROP COLUMN item`);
+    raw.run(`INSERT INTO questions (id, session_key, person, text, options, recommended, status, asked_at,
+      deadline_at, held_at, resolution, late_answers)
+      VALUES ('q0', 'laptop:/x', 'nur', 'БД?', '[{"id":"A","text":"SQLite"}]', 'A', 'decided', 50, 60, NULL,
+        '{"by":"agent","option":"A","reason":"по таймауту","at":60}', '[{"by":"human","option":"A","at":70}]')`);
+    raw.run('PRAGMA user_version = 5');
+    raw.close();
+
+    const store = SqliteStore.open(path);
+    const q = store.question('q0')!;
+    expect(q.items).toEqual([
+      {
+        text: 'БД?',
+        options: [{ id: 'A', text: 'SQLite' }],
+        recommended: 'A',
+        resolution: { by: 'agent', option: 'A', reason: 'по таймауту', at: 60 },
+        lateAnswers: [{ by: 'human', option: 'A', at: 70 }],
+      },
+    ]);
+    expect(q.status).toBe('decided');
+    expect(q.terminalAt).toBeUndefined();
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 describe('SqliteStore: входящие', () => {
   test('ящик — непрочитанные по порядку; прочитанные — только по include', () => {
     const store = SqliteStore.open(':memory:');

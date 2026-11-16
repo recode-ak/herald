@@ -2,13 +2,14 @@ import { Database } from 'bun:sqlite';
 import type { MessageLink, PurgeCounts, PurgeReport, Store } from '../app/store.ts';
 import type { PersonId } from '../domain/access.ts';
 import { Inbox, InboxItem, type InboxKind } from '../domain/inbox.ts';
-import { Question, type QuestionStatus } from '../domain/question.ts';
+import { Question, type QuestionItem, type QuestionStatus } from '../domain/question.ts';
 import { Session } from '../domain/session.ts';
 
 /**
  * Схема: v1 — таблицы, v2 — название сессии, v3 — закрытие окна, v4 — срок вопроса,
  * v5 — время связи с сообщением (для очистки; ставит SQLite при сохранении; ALTER не умеет DEFAULT-выражение —
- * таблица пересоздаётся). Версия — `PRAGMA user_version`; следующая — новый элемент массива.
+ * таблица пересоздаётся), v6 — пачка вопросов: пункты JSON-ом (`items`; плоские поля — первый пункт, для чтения
+ * старых строк), перевод в терминал, пункт в связи с сообщением. Версия — `PRAGMA user_version`; следующая — новый элемент массива.
  */
 const MIGRATIONS = [
   `
@@ -91,6 +92,17 @@ const MIGRATIONS = [
   CREATE INDEX message_links_question ON message_links (question_id);
   CREATE INDEX message_links_inbox ON message_links (inbox_id);
   `,
+  `
+  CREATE TABLE IF NOT EXISTS questions (
+    id TEXT PRIMARY KEY, session_key TEXT NOT NULL, person TEXT NOT NULL, text TEXT NOT NULL, options TEXT NOT NULL,
+    recommended TEXT, status TEXT NOT NULL, asked_at INTEGER NOT NULL, held_at INTEGER, resolution TEXT,
+    late_answers TEXT NOT NULL, deadline_at INTEGER
+  );
+  ALTER TABLE questions ADD COLUMN items TEXT;
+  ALTER TABLE questions ADD COLUMN terminal_at INTEGER;
+  ALTER TABLE message_links ADD COLUMN item INTEGER;
+  CREATE INDEX questions_open ON questions (session_key, status, asked_at);
+  `,
 ];
 
 /** Сигнал отката транзакции пробной очистки (`dryRun`). */
@@ -122,6 +134,8 @@ interface QuestionRow {
   held_at: number | null;
   resolution: string | null;
   late_answers: string;
+  items: string | null;
+  terminal_at: number | null;
 }
 
 interface InboxRow {
@@ -142,6 +156,7 @@ interface LinkRow {
   session_key: string;
   question_id: string | null;
   inbox_id: string | null;
+  item: number | null;
 }
 
 /** Хранилище на SQLite: одна таблица на сущность, состояние домена — через `toState`/`restore`. */
@@ -210,44 +225,44 @@ export class SqliteStore implements Store {
 
   question(id: string): Question | undefined {
     const r = this.db.query<QuestionRow, [string]>('SELECT * FROM questions WHERE id = ?').get(id);
-    if (!r) return undefined;
-    return Question.restore({
-      id: r.id,
-      sessionKey: r.session_key,
-      person: r.person,
-      text: r.text,
-      options: JSON.parse(r.options),
-      ...(r.recommended !== null && { recommended: r.recommended }),
-      status: r.status,
-      askedAt: r.asked_at,
-      ...(r.deadline_at !== null && { deadlineAt: r.deadline_at }),
-      ...(r.held_at !== null && { heldAt: r.held_at }),
-      ...(r.resolution !== null && { resolution: JSON.parse(r.resolution) }),
-      lateAnswers: JSON.parse(r.late_answers),
-    });
+    return r ? SqliteStore.toQuestion(r) : undefined;
+  }
+
+  openQuestions(sessionKey: string): Question[] {
+    return this.db
+      .query<QuestionRow, [string]>(
+        "SELECT * FROM questions WHERE session_key = ? AND status = 'open' ORDER BY asked_at, id",
+      )
+      .all(sessionKey)
+      .map(SqliteStore.toQuestion);
   }
 
   saveQuestion(question: Question): void {
     const q = question.toState();
+    const first = question.items[0];
+    if (!first) throw new Error(`вопрос ${q.id} без пунктов`);
     this.db
       .query(
         `INSERT OR REPLACE INTO questions
-           (id, session_key, person, text, options, recommended, status, asked_at, deadline_at, held_at, resolution, late_answers)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, session_key, person, text, options, recommended, status, asked_at, deadline_at, held_at, resolution,
+            late_answers, items, terminal_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         q.id,
         q.sessionKey,
         q.person,
-        q.text,
-        JSON.stringify(q.options),
-        q.recommended ?? null,
+        first.text,
+        JSON.stringify(first.options),
+        first.recommended ?? null,
         q.status,
         q.askedAt,
         q.deadlineAt ?? null,
         q.heldAt ?? null,
-        q.resolution ? JSON.stringify(q.resolution) : null,
-        JSON.stringify(q.lateAnswers),
+        first.resolution ? JSON.stringify(first.resolution) : null,
+        JSON.stringify(first.lateAnswers),
+        JSON.stringify(q.items),
+        q.terminalAt ?? null,
       );
   }
 
@@ -299,10 +314,17 @@ export class SqliteStore implements Store {
   saveLink(link: MessageLink): void {
     this.db
       .query(
-        `INSERT OR REPLACE INTO message_links (chat_id, message_id, session_key, question_id, inbox_id)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO message_links (chat_id, message_id, session_key, question_id, inbox_id, item)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(link.chatId, link.messageId, link.sessionKey, link.questionId ?? null, link.inboxId ?? null);
+      .run(
+        link.chatId,
+        link.messageId,
+        link.sessionKey,
+        link.questionId ?? null,
+        link.inboxId ?? null,
+        link.item ?? null,
+      );
   }
 
   link(chatId: number, messageId: number): MessageLink | undefined {
@@ -423,6 +445,33 @@ export class SqliteStore implements Store {
       sessionKey: r.session_key,
       ...(r.question_id !== null && { questionId: r.question_id }),
       ...(r.inbox_id !== null && { inboxId: r.inbox_id }),
+      ...(r.item !== null && { item: r.item }),
     };
+  }
+
+  /** Строка до v6 (`items` нет) — пачка из одного пункта по плоским полям. */
+  private static toQuestion(r: QuestionRow): Question {
+    const items: QuestionItem[] = r.items
+      ? JSON.parse(r.items)
+      : [
+          {
+            text: r.text,
+            options: JSON.parse(r.options),
+            ...(r.recommended !== null && { recommended: r.recommended }),
+            ...(r.resolution !== null && { resolution: JSON.parse(r.resolution) }),
+            lateAnswers: JSON.parse(r.late_answers),
+          },
+        ];
+    return Question.restore({
+      id: r.id,
+      sessionKey: r.session_key,
+      person: r.person,
+      items,
+      status: r.status,
+      askedAt: r.asked_at,
+      ...(r.deadline_at !== null && { deadlineAt: r.deadline_at }),
+      ...(r.held_at !== null && { heldAt: r.held_at }),
+      ...(r.terminal_at !== null && { terminalAt: r.terminal_at }),
+    });
   }
 }

@@ -13,6 +13,7 @@ describe('Wire', () => {
       status: 'open',
       askedAt: 5,
       lateAnswers: [],
+      items: [{ text: 'БД?', options: [{ id: 'A', text: 'SQLite' }], lateAnswers: [] }],
     });
 
     const q = Question.ask({ ...draft, recommended: 'A', timeoutMs: 100 }, 5);
@@ -29,7 +30,36 @@ describe('Wire', () => {
       heldAt: 6,
       resolution: { by: 'human', option: 'A', at: 7 },
       lateAnswers: [],
+      items: [
+        {
+          text: 'БД?',
+          options: [{ id: 'A', text: 'SQLite' }],
+          recommended: 'A',
+          resolution: { by: 'human', option: 'A', at: 7 },
+          lateAnswers: [],
+        },
+      ],
     });
+  });
+
+  test('пачка — пункты в items, плоские поля — первый пункт; перевод в терминал', () => {
+    const q = Question.ask(
+      {
+        id: 'q_2',
+        sessionKey: 'h:/r',
+        person: 'nur',
+        items: [
+          { text: 'БД?', options: [{ id: 'A', text: 'SQLite' }] },
+          { text: 'Порт?', options: [] },
+        ],
+      },
+      5,
+    );
+    q.moveToTerminal(6);
+    const wire = Wire.question(q);
+    expect(wire.text).toBe('БД?');
+    expect(wire.terminalAt).toBe(6);
+    expect(wire.items.map((i) => i.text)).toEqual(['БД?', 'Порт?']);
   });
 
   test('входящее — без человека, сессии и времени прочтения', () => {
