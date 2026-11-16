@@ -6,8 +6,8 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: `bun run check` зелёный; требования 1–17 покрыты тестами; старый одиночный `ask` работает без изменений.
 
-- [ ] Task: Домен — `Question` как пачка пунктов: ответ по пункту, `decide` по неотвеченным, `moveToTerminal`, `answerInTerminal`; вид входящих `to-terminal`
-- [ ] Task: Хранилище — миграция v6 (`items`, `terminal_at`, `message_links.item`), чтение старых строк
+- [x] Task: Домен — `Question` как пачка пунктов: ответ по пункту, `decide` по неотвеченным, `moveToTerminal`, `answerInTerminal`; вид входящих `to-terminal` (0fd9793)
+- [x] Task: Хранилище — миграция v6 (`items`, `terminal_at`, `message_links.item`), чтение старых строк (0fd9793)
 - [ ] Task: Бот — пункты по очереди, «Вопрос N из M», ответ по пункту, `answer` по готовности пачки
 - [ ] Task: Бот — «Жди меня (вся пачка)», «🖥 В терминал», итог решения агента
 - [ ] Task: Агент и HTTP — `ask` с `questions`, `decide`/`answered` с `answers`, `POST /v1/to-terminal`, провод
