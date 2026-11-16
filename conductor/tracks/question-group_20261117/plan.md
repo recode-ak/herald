@@ -20,6 +20,6 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Клиент и CLI — пачка в `ask`, `--answers`, `herald to-terminal` (934b4be)
 - [x] Task: Канал — `ask`/`decide`/`answered` с пачкой, `to_terminal`, событие `to-terminal`, инструкции (c5f11d5)
 - [x] Task: Мост pi — доставка `to-terminal` (6ad9c80)
-- [ ] Task: Документы — `docs/model.md`, `docs/install.md`
+- [x] Task: Документы — `docs/model.md`, `docs/install.md` (495d32f)
 - [ ] Task: Выкатка и ручная проверка на проде
 - [ ] Task: Conductor - User Manual Verification 'Фаза 2: Клиенты, документы и выкатка' (Protocol in workflow.md)
