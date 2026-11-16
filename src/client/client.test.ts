@@ -32,6 +32,7 @@ function setup(maxWaitMs = 40) {
     clock,
     ids: new SeqIds(),
     waiter: new Waiter(clock),
+    timeZone: 'Asia/Oral',
   };
   const human = new HumanService(deps);
   const calls: string[] = [];
@@ -80,8 +81,8 @@ describe('HeraldClient', () => {
     await c.bye();
     await c.notify('Ещё');
     expect(k.telegram.last(NUR_CHAT)?.text).toBe('[laptop · u7-school · ревью]\nЕщё');
-    const q = await c.ask({ text: 'Какую БД?', options, recommended: 'A' });
-    expect(q.status).toBe('open');
+    const q = await c.ask({ text: 'Какую БД?', options, recommended: 'A', timeoutMs: 180_000 });
+    expect(q).toMatchObject({ status: 'open', deadlineAt: q.askedAt + 180_000 });
     const decided = await c.decide(q.id, { option: 'A' }, 'по таймауту');
     expect(decided.resolution).toMatchObject({ by: 'agent', option: 'A' });
   });

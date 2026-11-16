@@ -41,20 +41,20 @@ export class Messages {
     return Messages.notifyIn(HTML, session, text);
   }
 
-  /** Текст вопроса с текущим состоянием: решение и переигрывания. */
-  static question(question: Question, session: Session): string {
-    return Messages.questionIn(PLAIN, question, session);
+  /** Текст вопроса с текущим состоянием: срок, решение, переигрывания. `timeZone` — пояс, в котором показан срок. */
+  static question(question: Question, session: Session, timeZone: string): string {
+    return Messages.questionIn(PLAIN, question, session, timeZone);
   }
 
-  static questionHtml(question: Question, session: Session): string {
-    return Messages.questionIn(HTML, question, session);
+  static questionHtml(question: Question, session: Session, timeZone: string): string {
+    return Messages.questionIn(HTML, question, session, timeZone);
   }
 
   private static notifyIn(style: Style, session: Session, text: string): string {
     return `${style.bold(style.plain(Messages.header(session)))}\n${style.markdown(text)}`;
   }
 
-  private static questionIn(style: Style, question: Question, session: Session): string {
+  private static questionIn(style: Style, question: Question, session: Session, timeZone: string): string {
     const lines = [
       style.bold(style.plain(Messages.header(session))),
       `❓ ${style.bold(style.markdown(question.text))}`,
@@ -71,7 +71,8 @@ export class Messages {
       question.options.length > 0 ? 'Ответь кнопкой или reply на это сообщение.' : 'Ответь reply на это сообщение.';
     lines.push('', style.italic(hint));
     let text = lines.join('\n');
-    if (question.heldAt !== undefined && question.status === 'open') text += '\n\n⏸ Агент ждёт твоего ответа.';
+    const wait = Messages.waiting(question, timeZone);
+    if (wait) text += `\n\n${wait}`;
     const r = question.resolution;
     if (r?.by === 'agent') {
       const replay = Messages.humanAnswered(question) ? '' : ' Кнопки — чтобы переиграть.';
@@ -83,16 +84,44 @@ export class Messages {
     return text;
   }
 
+  /** Сколько ждёт агент — пока вопрос открыт: срок, «Жди меня» или без ограничения. */
+  private static waiting(question: Question, timeZone: string): string | undefined {
+    if (question.status !== 'open') return undefined;
+    if (question.heldAt !== undefined) return '⏸ Агент ждёт твоего ответа.';
+    const deadline = question.deadlineAt;
+    if (deadline === undefined) return '⏳ Время не ограничено: агент ждёт твоего ответа.';
+    const span = Messages.span(deadline - question.askedAt);
+    return `⏳ На раздумье ${span} — до ${Messages.clock(deadline, question.askedAt, timeZone)}, потом агент решит сам.`;
+  }
+
+  /** Длительность: «45 с», «1 мин 30 с», «1 ч 30 мин» (от часа — без секунд). */
+  static span(ms: number): string {
+    const total = Math.ceil(ms / 1000);
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    const parts = [hours && `${hours} ч`, minutes && `${minutes} мин`, !hours && seconds && `${seconds} с`];
+    return parts.filter(Boolean).join(' ') || '0 с';
+  }
+
+  /** Время `at` в поясе; другой день, чем `since`, — с датой: «05:03», «02.01 05:00». */
+  private static clock(at: number, since: number, timeZone: string): string {
+    const time = new Intl.DateTimeFormat('ru-RU', { timeZone, hour: '2-digit', minute: '2-digit' }).format(at);
+    const day = new Intl.DateTimeFormat('ru-RU', { timeZone, day: '2-digit', month: '2-digit' });
+    return day.format(at) === day.format(since) ? time : `${day.format(at)} ${time}`;
+  }
+
   /**
    * Кнопки вопроса. Ответил человек (в том числе переигрыванием) — кнопок нет, переиграть можно reply.
-   * Иначе — варианты (после решения агента — для переигрывания) и «Жди меня», пока вопрос открыт и не удержан.
+   * Иначе — варианты (после решения агента — для переигрывания) и «Жди меня», пока вопрос открыт, не удержан
+   * и задан с таймаутом (без таймаута агент и так ждёт: по кнопке видно, решит ли он сам).
    */
   static questionButtons(question: Question): Keyboard {
     if (Messages.humanAnswered(question)) return [];
     const options = question.options.map((o) => [
       { text: `${o.id}${Messages.star(question, o.id)}`, data: `a:${question.id}:${o.id}` },
     ]);
-    const canHold = question.status === 'open' && question.heldAt === undefined;
+    const canHold = question.status === 'open' && question.heldAt === undefined && question.deadlineAt !== undefined;
     return canHold ? [...options, [{ text: 'Жди меня', data: `h:${question.id}` }]] : options;
   }
 

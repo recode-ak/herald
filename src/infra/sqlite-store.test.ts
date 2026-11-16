@@ -22,6 +22,7 @@ function question(id = 'q1', sessionKey = Session.keyOf(ref)) {
         { id: 'B', text: 'Postgres' },
       ],
       recommended: 'A',
+      timeoutMs: 180_000,
     },
     100,
   );
@@ -46,13 +47,17 @@ describe('SqliteStore: сессии', () => {
     expect(store.session('нет')).toBeUndefined();
   });
 
-  test('миграция v1 → v2: сессии сохраняются, название пишется', () => {
+  test('миграция с v1: сессии и вопросы сохраняются, название пишется, у старых вопросов срока нет', () => {
     const dir = mkdtempSync(join(tmpdir(), 'herald-mig-'));
     const path = join(dir, 'v1.db');
     const v1 = new Database(path, { create: true });
     v1.run(`CREATE TABLE sessions (key TEXT PRIMARY KEY, person TEXT NOT NULL, host TEXT NOT NULL,
       project TEXT NOT NULL, root TEXT NOT NULL, last_seen_at INTEGER NOT NULL, status_text TEXT, status_at INTEGER)`);
     v1.run(`INSERT INTO sessions VALUES ('laptop:/x', 'nur', 'laptop', 'x', '/x', 100, NULL, NULL)`);
+    v1.run(`CREATE TABLE questions (id TEXT PRIMARY KEY, session_key TEXT NOT NULL, person TEXT NOT NULL,
+      text TEXT NOT NULL, options TEXT NOT NULL, recommended TEXT, status TEXT NOT NULL, asked_at INTEGER NOT NULL,
+      held_at INTEGER, resolution TEXT, late_answers TEXT NOT NULL)`);
+    v1.run(`INSERT INTO questions VALUES ('q0', 'laptop:/x', 'nur', 'БД?', '[]', NULL, 'open', 50, NULL, NULL, '[]')`);
     v1.run('PRAGMA user_version = 1');
     v1.close();
 
@@ -62,6 +67,7 @@ describe('SqliteStore: сессии', () => {
     s.setTitle('ревью', 200);
     store.saveSession(s);
     expect(store.session('laptop:/x')?.title).toBe('ревью');
+    expect(store.question('q0')?.deadlineAt).toBeUndefined();
     store.close();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -76,11 +82,12 @@ describe('SqliteStore: сессии', () => {
 });
 
 describe('SqliteStore: вопросы', () => {
-  test('полное состояние сохраняется: hold, решение, поздние ответы', () => {
+  test('полное состояние сохраняется: срок, hold, решение, поздние ответы', () => {
     const store = SqliteStore.open(':memory:');
     const q = question();
     store.saveQuestion(q);
     expect(store.question('q1')?.toState()).toEqual(q.toState());
+    expect(store.question('q1')?.deadlineAt).toBe(100 + 180_000);
 
     q.decide({ option: 'A' }, 'по таймауту', 200);
     q.answer({ text: 'лучше Postgres' }, 300);

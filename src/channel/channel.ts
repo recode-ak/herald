@@ -83,7 +83,7 @@ const EVENTS_INSTRUCTIONS = [
   '- kind="answer" question_id="..." — ответ на твой вопрос (option — id выбранного варианта).',
   '- kind="late-answer" question_id="..." — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
   '',
-  'ask задаёт вопрос с вариантами и сразу возвращает id — не жди, продолжай работу; ответ придёт событием. Если ответа долго нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»).',
+  'ask задаёт вопрос с вариантами и сразу возвращает id — не жди, продолжай работу; ответ придёт событием. С timeout_seconds: если к сроку ответа нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). Без timeout_seconds решать нельзя — жди ответа.',
   ...STATUS_AND_TITLE,
 ].join('\n');
 
@@ -95,7 +95,7 @@ const PULL_INSTRUCTIONS = [
   '- kind=answer question_id=... — ответ на твой вопрос (option — id выбранного варианта).',
   '- kind=late-answer question_id=... — переигрывание: ответ пришёл после твоего решения по таймауту; реши, нужно ли переделать.',
   '',
-  'ask задаёт вопрос с вариантами и сразу возвращает id; ответ забери инструментом inbox. Если ответа долго нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»).',
+  'ask задаёт вопрос с вариантами и сразу возвращает id; ответ забери инструментом inbox. С timeout_seconds: если к сроку ответа нет, прими рекомендованный вариант инструментом decide с причиной («по таймауту»). Без timeout_seconds решать нельзя — жди ответа.',
   ...STATUS_AND_TITLE,
 ].join('\n');
 
@@ -131,6 +131,11 @@ const TOOLS = [
           },
         },
         recommended: { type: 'string', description: 'id рекомендованного варианта' },
+        timeout_seconds: {
+          type: 'number',
+          description:
+            'сколько ждёшь ответа, прежде чем решить сам (decide); человек видит срок и кнопку «Жди меня». Без него decide запрещён — ждёшь ответа',
+        },
       },
       required: ['text'],
     },
@@ -385,10 +390,14 @@ export class HeraldChannel {
           return HeraldChannel.ok('название сессии обновлено');
         case 'ask': {
           const recommended = HeraldChannel.optionalString(args, 'recommended');
+          const timeout = args.timeout_seconds;
+          if (timeout !== undefined && (typeof timeout !== 'number' || !Number.isSafeInteger(timeout) || timeout < 0))
+            throw new ToolArgsError('аргумент «timeout_seconds» — ожидается целое число ≥ 0');
           const question = await this.herald.ask({
             text: HeraldChannel.string(args, 'text'),
             options: HeraldChannel.options(args),
             ...(recommended !== undefined && { recommended }),
+            ...(timeout !== undefined && { timeoutMs: timeout * 1_000 }),
           });
           return HeraldChannel.ok(
             this.events

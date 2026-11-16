@@ -13,6 +13,7 @@ const draft: QuestionDraft = {
     { id: 'B', text: 'JSON' },
   ],
   recommended: 'A',
+  timeoutMs: 180_000,
 };
 
 describe('Question — создание', () => {
@@ -44,6 +45,18 @@ describe('Question — создание', () => {
         t0,
       ),
     ).toThrow(DomainError);
+  });
+
+  test('таймаут задаёт срок решения агента; без таймаута срока нет', () => {
+    expect(Question.ask(draft, t0).deadlineAt).toBe(t0 + 180_000);
+    expect(Question.ask({ ...draft, timeoutMs: undefined }, t0).deadlineAt).toBeUndefined();
+  });
+
+  test('таймаут — целое число мс ≥ 0 (0 — агент решит сразу)', () => {
+    expect(Question.ask({ ...draft, timeoutMs: 0 }, t0).deadlineAt).toBe(t0);
+    for (const timeoutMs of [-1, 1.5, Number.NaN]) {
+      expect(() => Question.ask({ ...draft, timeoutMs }, t0)).toThrow(DomainError);
+    }
   });
 
   test('рекомендованный — только из вариантов', () => {
@@ -107,6 +120,12 @@ describe('Question — решение агента', () => {
     const q = Question.ask(draft, t0);
     expect(() => q.decide({ option: 'C' }, 'по таймауту', t0)).toThrow(DomainError);
     expect(() => q.decide({ option: 'A' }, ' ', t0)).toThrow(DomainError);
+  });
+
+  test('вопрос без таймаута агент не решает: ждёт ответа человека', () => {
+    const q = Question.ask({ ...draft, timeoutMs: undefined }, t0);
+    expect(() => q.decide({ option: 'A' }, 'по таймауту', t0 + 1)).toThrow('без таймаута');
+    expect(q.status).toBe('open');
   });
 });
 

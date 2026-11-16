@@ -9,6 +9,7 @@ const db = {
     { id: 'A', text: 'SQLite' },
     { id: 'B', text: 'Postgres' },
   ],
+  timeoutMs: 180_000,
 };
 
 function setup() {

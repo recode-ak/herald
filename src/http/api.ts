@@ -45,10 +45,12 @@ export class HttpApi {
         '/v1/ask',
         async (c, b) => {
           const recommended = b.optionalString('recommended');
+          const timeoutMs = b.optionalMs('timeoutMs');
           const input = {
             text: b.string('text'),
             options: b.options(),
             ...(recommended !== undefined && { recommended }),
+            ...(timeoutMs !== undefined && { timeoutMs }),
           };
           return { question: Wire.question(await agent.ask(c, input)) };
         },

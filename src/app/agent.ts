@@ -17,12 +17,16 @@ export interface AgentDeps {
   clock: Clock;
   ids: Ids;
   waiter: Waiter;
+  /** Пояс, в котором человеку показано время (срок вопроса). */
+  timeZone: string;
 }
 
 export interface AskInput {
   text: string;
   options: QuestionOption[];
   recommended?: string;
+  /** Сколько агент ждёт, прежде чем решить сам; без него решать будет нельзя. */
+  timeoutMs?: number;
 }
 
 /** Сценарии агента: уведомление, вопрос, решение, статус, входящие. Каждое обращение отмечает сессию активной. */
@@ -30,7 +34,7 @@ export class AgentService {
   private readonly notices: Notices;
 
   constructor(private readonly deps: AgentDeps) {
-    this.notices = new Notices(deps.store, deps.telegram);
+    this.notices = new Notices(deps.store, deps.telegram, deps.timeZone);
   }
 
   async notify(caller: Caller, text: string): Promise<void> {
@@ -61,8 +65,8 @@ export class AgentService {
     const chatId = this.deps.access.chatIdOf(caller.person);
     const messageId = await this.deps.telegram.send({
       chatId,
-      text: Messages.question(question, session),
-      html: Messages.questionHtml(question, session),
+      text: Messages.question(question, session, this.deps.timeZone),
+      html: Messages.questionHtml(question, session, this.deps.timeZone),
       buttons,
     });
     this.deps.store.transaction(() => {
@@ -72,7 +76,7 @@ export class AgentService {
     return question;
   }
 
-  /** Решение агента (по таймауту). Сообщение вопроса обновляется, кнопки остаются для переигрывания. */
+  /** Решение агента (по таймауту; вопрос без таймаута решает только человек). Сообщение вопроса обновляется, кнопки остаются для переигрывания. */
   async decide(caller: Caller, questionId: string, choice: Choice, reason: string): Promise<Question> {
     const session = this.enter(caller);
     const question = this.ownQuestion(caller, questionId);

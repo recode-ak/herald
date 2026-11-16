@@ -13,6 +13,7 @@ const db = {
     { id: 'B', text: 'Postgres' },
   ],
   recommended: 'A',
+  timeoutMs: 180_000,
 };
 
 const servers: { stop(force?: boolean): unknown }[] = [];
@@ -186,6 +187,25 @@ describe('Вопрос', () => {
       resolution: { by: 'agent', option: 'A', reason: 'по таймауту' },
     });
     expect(k.telegram.edits.length).toBe(1);
+  });
+
+  test('ask: timeoutMs → срок решения; без него агенту решать нельзя — 400', async () => {
+    const k = setup();
+    const timed = (await k.call('/v1/ask', { session, ...db })).json.question as QuestionWire;
+    expect(timed.deadlineAt).toBe(timed.askedAt + 180_000);
+
+    const { timeoutMs: _, ...untimed } = db;
+    const id = ((await k.call('/v1/ask', { session, ...untimed })).json.question as QuestionWire).id;
+    const res = await k.call('/v1/decide', { session, id, option: 'A', reason: 'по таймауту' });
+    expect(res.status).toBe(400);
+    expect(res.json.error).toContain('без таймаута');
+  });
+
+  test('ask: timeoutMs не целое ≥ 0 — 400', async () => {
+    const k = setup();
+    for (const timeoutMs of [-1, 1.5, '180']) {
+      expect((await k.call('/v1/ask', { session, ...db, timeoutMs })).status).toBe(400);
+    }
   });
 
   test('decide без варианта и текста — 400', async () => {

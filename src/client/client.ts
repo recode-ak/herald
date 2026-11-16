@@ -30,6 +30,8 @@ export interface AskRequest {
   text: string;
   options: QuestionOption[];
   recommended?: string;
+  /** Сколько агент ждёт, прежде чем решить сам; без него решать будет нельзя. */
+  timeoutMs?: number;
 }
 
 /**

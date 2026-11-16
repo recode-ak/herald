@@ -30,7 +30,8 @@ const USAGE = `herald — вопросы и уведомления челове�
   herald status <текст>                         статус сессии (в Telegram не отправляется)
   herald title <текст>                          название сессии — в шапке её сообщений
   herald ask <вопрос> [-o "A: текст"]… [--recommended A] [--timeout <с>]
-                                                вопрос; ждёт ответа (без --timeout — бесконечно)
+                                                вопрос; ждёт ответа (без --timeout — бесконечно,
+                                                и decide по нему запрещён)
   herald decide <id> (<вариант> | --text <текст>) --reason <причина>
                                                 решение агента (например, по таймауту)
   herald inbox [--wait <с>] [--ack]             входящие: ответы, поздние ответы, указания
@@ -113,6 +114,7 @@ export class Cli {
       text: Cli.text(args, 'текст вопроса'),
       options,
       ...(recommended !== undefined && { recommended }),
+      ...(timeoutMs !== undefined && { timeoutMs }),
     });
     const result = Cli.result(await client.awaitQuestion(asked.id, timeoutMs));
     this.print(result);

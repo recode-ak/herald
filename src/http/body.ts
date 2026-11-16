@@ -41,6 +41,11 @@ export class RequestBody {
     return value;
   }
 
+  /** Необязательное неотрицательное целое (мс); нет поля — `undefined`. */
+  optionalMs(name: string): number | undefined {
+    return this.data[name] === undefined ? undefined : this.waitMs(name);
+  }
+
   strings(name: string): string[] {
     const value = this.data[name];
     if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {

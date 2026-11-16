@@ -9,6 +9,8 @@ export interface QuestionWire {
   recommended?: string;
   status: QuestionStatus;
   askedAt: number;
+  /** Срок, после которого агент решает сам; нет — решает только человек. */
+  deadlineAt?: number;
   heldAt?: number;
   resolution?: Resolution;
   lateAnswers: Resolution[];
@@ -28,7 +30,8 @@ export interface InboxItemWire {
 // biome-ignore lint/complexity/noStaticOnlyClass: правило проекта — класс с зоной ответственности вместо россыпи функций
 export class Wire {
   static question(q: Question): QuestionWire {
-    const { id, text, options, recommended, status, askedAt, heldAt, resolution, lateAnswers } = q.toState();
+    const { id, text, options, recommended, status, askedAt, deadlineAt, heldAt, resolution, lateAnswers } =
+      q.toState();
     return {
       id,
       text,
@@ -36,6 +39,7 @@ export class Wire {
       ...(recommended !== undefined && { recommended }),
       status,
       askedAt,
+      ...(deadlineAt !== undefined && { deadlineAt }),
       ...(heldAt !== undefined && { heldAt }),
       ...(resolution && { resolution }),
       lateAnswers,

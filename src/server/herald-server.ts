@@ -34,7 +34,7 @@ export class HeraldServer {
     const store = SqliteStore.open(config.dbPath);
     const telegram = new TelegramBotApi({ token: config.botToken, baseUrl: config.telegramApiUrl, clock });
     const waiter = new Waiter(clock);
-    const deps = { store, telegram, access: config.access, clock, ids, waiter };
+    const deps = { store, telegram, access: config.access, clock, ids, waiter, timeZone: config.timeZone };
 
     const agent = new AgentService(deps);
     const human = new HumanService(deps);

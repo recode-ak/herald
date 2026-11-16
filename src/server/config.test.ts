@@ -12,6 +12,7 @@ describe('ServerConfig.fromEnv', () => {
     expect(config.botToken).toBe('123:abc');
     expect(config.telegramApiUrl).toBe('https://api.telegram.org');
     expect(config.maxWaitMs).toBe(50_000);
+    expect(config.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
     expect(config.access.personByToken('t-nur')).toBe('nur');
     expect(config.access.chatIdOf('nur')).toBe(111);
   });
@@ -24,6 +25,7 @@ describe('ServerConfig.fromEnv', () => {
       HERALD_DB: '/srv/herald/data/herald.db',
       HERALD_TELEGRAM_API: 'http://127.0.0.1:9999/',
       HERALD_MAX_WAIT_SECONDS: '25',
+      HERALD_TIME_ZONE: 'Asia/Oral',
     });
     expect(config).toMatchObject({
       port: 0,
@@ -31,7 +33,12 @@ describe('ServerConfig.fromEnv', () => {
       dbPath: '/srv/herald/data/herald.db',
       telegramApiUrl: 'http://127.0.0.1:9999',
       maxWaitMs: 25_000,
+      timeZone: 'Asia/Oral',
     });
+  });
+
+  test('неизвестный пояс — ConfigError с именем переменной', () => {
+    expect(() => ServerConfig.fromEnv({ ...required, HERALD_TIME_ZONE: 'Asia/Nowhere' })).toThrow('HERALD_TIME_ZONE');
   });
 
   test('нет обязательной переменной — ConfigError с её именем', () => {

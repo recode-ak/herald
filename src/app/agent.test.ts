@@ -21,6 +21,7 @@ const db = {
     { id: 'B', text: 'Postgres' },
   ],
   recommended: 'A',
+  timeoutMs: 180_000,
 };
 
 describe('AgentService.notify', () => {
@@ -75,7 +76,8 @@ describe('AgentService.ask', () => {
 
     const msg = telegram.last(NUR_CHAT)!;
     expect(msg.text).toBe(
-      '[laptop · u7-school]\n❓ Какую БД?\n\nA: SQLite ⭐\nB: Postgres\n\nОтветь кнопкой или reply на это сообщение.',
+      '[laptop · u7-school]\n❓ Какую БД?\n\nA: SQLite ⭐\nB: Postgres\n\nОтветь кнопкой или reply на это сообщение.' +
+        '\n\n⏳ На раздумье 3 мин — до 05:19, потом агент решит сам.',
     );
     expect(msg.buttons).toEqual([
       [{ text: 'A ⭐', data: 'a:q_1:A' }],
@@ -87,10 +89,23 @@ describe('AgentService.ask', () => {
 
   test('без вариантов — только «Жди меня» и свободный ответ', async () => {
     const { agent, telegram } = setup();
-    await agent.ask(nur, { text: 'Как назвать?', options: [] });
+    await agent.ask(nur, { text: 'Как назвать?', options: [], timeoutMs: 60_000 });
     const msg = telegram.last(NUR_CHAT)!;
-    expect(msg.text).toBe('[laptop · u7-school]\n❓ Как назвать?\n\nОтветь reply на это сообщение.');
+    expect(msg.text).toBe(
+      '[laptop · u7-school]\n❓ Как назвать?\n\nОтветь reply на это сообщение.\n\n⏳ На раздумье 1 мин — до 05:17, потом агент решит сам.',
+    );
     expect(msg.buttons).toEqual([[{ text: 'Жди меня', data: 'h:q_1' }]]);
+  });
+
+  test('без таймаута — время не ограничено, «Жди меня» нет; решать агенту нельзя', async () => {
+    const { agent, telegram, store } = setup();
+    const { timeoutMs: _, ...untimed } = db;
+    const q = await agent.ask(nur, untimed);
+    const msg = telegram.last(NUR_CHAT)!;
+    expect(msg.text).toEndWith('\n\n⏳ Время не ограничено: агент ждёт твоего ответа.');
+    expect(msg.buttons).toEqual([[{ text: 'A ⭐', data: 'a:q_1:A' }], [{ text: 'B', data: 'a:q_1:B' }]]);
+    await expect(agent.decide(nur, q.id, { option: 'A' }, 'по таймауту')).rejects.toThrow('без таймаута');
+    expect(store.question(q.id)?.status).toBe('open');
   });
 
   test('ошибка доставки — вопрос не сохраняется', async () => {
@@ -119,13 +134,13 @@ describe('AgentService.decide', () => {
     expect(store.question(q.id)?.status).toBe('decided');
 
     const after = telegram.message(NUR_CHAT, before.messageId)!;
-    expect(after.text).toBe(`${before.text}\n\n🤖 Принят A по таймауту. Кнопки — чтобы переиграть.`);
+    expect(after.text).toBe(before.text.replace(/⏳ .*$/, '🤖 Принят A по таймауту. Кнопки — чтобы переиграть.'));
     expect(after.buttons).toEqual(before.buttons?.slice(0, -1));
   });
 
   test('свободный текст решения', async () => {
     const { agent, telegram } = setup();
-    const q = await agent.ask(nur, { text: 'Как назвать?', options: [] });
+    const q = await agent.ask(nur, { text: 'Как назвать?', options: [], timeoutMs: 0 });
     await agent.decide(nur, q.id, { text: 'herald' }, 'по таймауту');
     expect(telegram.last(NUR_CHAT)?.text).toEndWith('🤖 Принято «herald» по таймауту. Кнопки — чтобы переиграть.');
   });

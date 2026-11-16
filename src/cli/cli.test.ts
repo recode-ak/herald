@@ -28,6 +28,7 @@ function setup() {
     clock,
     ids: new SeqIds(),
     waiter: new Waiter(clock),
+    timeZone: 'Asia/Oral',
   };
   const human = new HumanService(deps);
   const server = new HttpApi({ agent: new AgentService(deps), access: deps.access, maxWaitMs: 40 }).listen({
@@ -141,8 +142,20 @@ describe('herald notify / status', () => {
 describe('herald ask', () => {
   test('ответ кнопкой — JSON с вариантом и текстом, код 0 (КП 2)', async () => {
     const k = setup();
-    const running = k.run(['ask', 'Какую БД?', '-o', 'A: SQLite', '-o', 'B: Postgres', '--recommended', 'A']);
+    const running = k.run([
+      'ask',
+      'Какую БД?',
+      '-o',
+      'A: SQLite',
+      '-o',
+      'B: Postgres',
+      '--recommended',
+      'A',
+      '--timeout',
+      '600',
+    ]);
     const msg = await k.asked();
+    expect(msg.text).toContain('На раздумье 10 мин');
     expect(msg.buttons?.flat().map((b) => b.text)).toContain('Жди меня');
     const id = msg.buttons![0]![0]!.data.split(':')[1];
     await k.press(`a:${id}:B`);
@@ -168,10 +181,12 @@ describe('herald ask', () => {
     expect(r.json.id).toBeString();
   });
 
-  test('без --timeout ждёт дольше одного long poll', async () => {
+  test('без --timeout ждёт дольше одного long poll; в сообщении — время не ограничено, «Жди меня» нет', async () => {
     const k = setup();
-    const running = k.run(['ask', 'Как назвать?']);
-    await k.asked();
+    const running = k.run(['ask', 'Как назвать?', '-o', 'A: herald']);
+    const msg = await k.asked();
+    expect(msg.text).toContain('Время не ограничено');
+    expect(msg.buttons?.flat().map((b) => b.text)).not.toContain('Жди меня');
     await Bun.sleep(200);
     await k.reply('herald');
     expect((await running).code).toBe(0);

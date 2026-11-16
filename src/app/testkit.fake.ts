@@ -63,6 +63,7 @@ export function testkit() {
     clock,
     ids: new SeqIds(),
     waiter: new Waiter(clock),
+    timeZone: 'Asia/Oral',
   };
 }
 

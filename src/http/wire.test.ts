@@ -15,7 +15,7 @@ describe('Wire', () => {
       lateAnswers: [],
     });
 
-    const q = Question.ask({ ...draft, recommended: 'A' }, 5);
+    const q = Question.ask({ ...draft, recommended: 'A', timeoutMs: 100 }, 5);
     q.hold(6);
     q.answer({ option: 'A' }, 7);
     expect(Wire.question(q)).toEqual({
@@ -25,6 +25,7 @@ describe('Wire', () => {
       recommended: 'A',
       status: 'answered',
       askedAt: 5,
+      deadlineAt: 105,
       heldAt: 6,
       resolution: { by: 'human', option: 'A', at: 7 },
       lateAnswers: [],

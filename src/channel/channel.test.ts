@@ -113,6 +113,16 @@ describe('HeraldChannel — инструменты', () => {
     ]);
   });
 
+  test('ask с timeout_seconds — таймаут в мс; неверный — isError', async () => {
+    const { herald, call } = await setup();
+    await call('ask', { text: 'БД?', options: [{ id: 'A', text: 'SQLite' }], timeout_seconds: 180 });
+    expect(herald.asked.at(-1)).toMatchObject({ timeoutMs: 180_000 });
+    for (const timeout_seconds of [-1, 1.5, '180']) {
+      expect((await call('ask', { text: 'БД?', timeout_seconds })).isError).toBe(true);
+    }
+    expect(herald.asked).toHaveLength(1);
+  });
+
   test('ask без вариантов', async () => {
     const { herald, call } = await setup();
     await call('ask', { text: 'Как назвать?' });

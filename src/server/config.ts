@@ -21,6 +21,8 @@ export class ServerConfig {
     readonly hostname: string,
     readonly dbPath: string,
     readonly maxWaitMs: number,
+    /** Пояс, в котором человеку показано время (`HERALD_TIME_ZONE`, IANA); по умолчанию — пояс системы. */
+    readonly timeZone: string,
   ) {}
 
   static fromEnv(env: Env): ServerConfig {
@@ -36,7 +38,18 @@ export class ServerConfig {
       env.HERALD_HOSTNAME?.trim() || '127.0.0.1',
       env.HERALD_DB?.trim() || './data/herald.db',
       ServerConfig.integer(env, 'HERALD_MAX_WAIT_SECONDS', 50, 1, HttpApi.MAX_WAIT_LIMIT_MS / 1000) * 1000,
+      ServerConfig.timeZone(env, 'HERALD_TIME_ZONE'),
     );
+  }
+
+  private static timeZone(env: Env, name: string): string {
+    const raw = env[name]?.trim();
+    if (!raw) return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    try {
+      return new Intl.DateTimeFormat('ru-RU', { timeZone: raw }).resolvedOptions().timeZone;
+    } catch {
+      throw new ConfigError(`${name}: «${raw}» — неизвестный часовой пояс`);
+    }
   }
 
   private static required(env: Env, name: string): string {

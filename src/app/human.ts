@@ -17,6 +17,8 @@ export interface HumanDeps {
   clock: Clock;
   ids: Ids;
   waiter: Waiter;
+  /** Пояс, в котором человеку показано время (срок вопроса). */
+  timeZone: string;
 }
 
 type MessageUpdate = Extract<TelegramUpdate, { kind: 'message' }>;
@@ -31,7 +33,7 @@ export class HumanService {
   private readonly notices: Notices;
 
   constructor(private readonly deps: HumanDeps) {
-    this.notices = new Notices(deps.store, deps.telegram);
+    this.notices = new Notices(deps.store, deps.telegram, deps.timeZone);
   }
 
   async handle(update: TelegramUpdate): Promise<void> {

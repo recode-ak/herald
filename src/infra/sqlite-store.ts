@@ -5,7 +5,7 @@ import { Inbox, InboxItem, type InboxKind } from '../domain/inbox.ts';
 import { Question, type QuestionStatus } from '../domain/question.ts';
 import { Session } from '../domain/session.ts';
 
-/** Схема: v1 — таблицы, v2 — название сессии, v3 — закрытие окна. Версия — `PRAGMA user_version`; следующая — новый элемент массива. */
+/** Схема: v1 — таблицы, v2 — название сессии, v3 — закрытие окна, v4 — срок вопроса. Версия — `PRAGMA user_version`; следующая — новый элемент массива. */
 const MIGRATIONS = [
   `
   CREATE TABLE sessions (
@@ -65,6 +65,7 @@ const MIGRATIONS = [
   `,
   'ALTER TABLE sessions ADD COLUMN title TEXT;',
   'ALTER TABLE sessions ADD COLUMN closed_at INTEGER;',
+  'ALTER TABLE questions ADD COLUMN deadline_at INTEGER;',
 ];
 
 interface SessionRow {
@@ -89,6 +90,7 @@ interface QuestionRow {
   recommended: string | null;
   status: QuestionStatus;
   asked_at: number;
+  deadline_at: number | null;
   held_at: number | null;
   resolution: string | null;
   late_answers: string;
@@ -190,6 +192,7 @@ export class SqliteStore implements Store {
       ...(r.recommended !== null && { recommended: r.recommended }),
       status: r.status,
       askedAt: r.asked_at,
+      ...(r.deadline_at !== null && { deadlineAt: r.deadline_at }),
       ...(r.held_at !== null && { heldAt: r.held_at }),
       ...(r.resolution !== null && { resolution: JSON.parse(r.resolution) }),
       lateAnswers: JSON.parse(r.late_answers),
@@ -201,8 +204,8 @@ export class SqliteStore implements Store {
     this.db
       .query(
         `INSERT OR REPLACE INTO questions
-           (id, session_key, person, text, options, recommended, status, asked_at, held_at, resolution, late_answers)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, session_key, person, text, options, recommended, status, asked_at, deadline_at, held_at, resolution, late_answers)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         q.id,
@@ -213,6 +216,7 @@ export class SqliteStore implements Store {
         q.recommended ?? null,
         q.status,
         q.askedAt,
+        q.deadlineAt ?? null,
         q.heldAt ?? null,
         q.resolution ? JSON.stringify(q.resolution) : null,
         JSON.stringify(q.lateAnswers),

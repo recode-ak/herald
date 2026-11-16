@@ -5,7 +5,7 @@
 | Что | Где |
 |---|---|
 | Код | `/srv/herald` (git clone, ветка `main`) |
-| Секреты | `/srv/herald/.env` (600): `HERALD_BOT_TOKEN`, `HERALD_TOKENS`, `HERALD_PEOPLE` — Bun читает его сам; прочие переменные — `docs/model.md`, «Сервер» |
+| Секреты | `/srv/herald/.env` (600): `HERALD_BOT_TOKEN`, `HERALD_TOKENS`, `HERALD_PEOPLE`, `HERALD_TIME_ZONE=Asia/Oral` — Bun читает его сам; прочие переменные — `docs/model.md`, «Сервер» |
 | БД | `/srv/herald/data/herald.db` (SQLite, WAL) |
 | Процесс | pm2 `herald`: `bun src/server/main.ts`, слушает `127.0.0.1:4518` (chronicle — 4517) |
 | Публикация | nginx `/etc/nginx/sites-available/herald.u7-hub.kz` → `https://herald.u7-hub.kz` (сертификат certbot) |
@@ -22,7 +22,7 @@ Telegram опрашивает только этот процесс (long polling
 ```bash
 ssh kalki_server
 git clone https://github.com/recode-ak/herald.git /srv/herald && cd /srv/herald
-install -m 600 /dev/null .env && $EDITOR .env      # HERALD_BOT_TOKEN, HERALD_TOKENS, HERALD_PEOPLE
+install -m 600 /dev/null .env && $EDITOR .env      # HERALD_BOT_TOKEN, HERALD_TOKENS, HERALD_PEOPLE, HERALD_TIME_ZONE
 bash scripts/deploy.sh                              # зависимости, pm2 start, проверка /health
 ```
 

@@ -25,13 +25,17 @@ export interface QuestionDraft {
   text: string;
   options: QuestionOption[];
   recommended?: string;
+  /** Сколько агент ждёт ответа, прежде чем решить сам. Без таймаута агент решать не вправе — ждёт человека. */
+  timeoutMs?: number;
 }
 
 export type QuestionStatus = 'open' | 'answered' | 'decided';
 
-export interface QuestionState extends QuestionDraft {
+export interface QuestionState extends Omit<QuestionDraft, 'timeoutMs'> {
   status: QuestionStatus;
   askedAt: number;
+  /** Срок, после которого агент решает сам; нет — решать агенту нельзя. */
+  deadlineAt?: number;
   heldAt?: number;
   resolution?: Resolution;
   lateAnswers: Resolution[];
@@ -40,7 +44,7 @@ export interface QuestionState extends QuestionDraft {
 /**
  * Вопрос агента человеку. `open → answered` (ответ человека) или `open → decided` (решение агента).
  * Ответ человека после решения или повторный — поздний: сохраняется, первое решение не меняет.
- * «Жди меня» (`hold`) запрещает агенту решать вопрос.
+ * Решать агенту можно только вопрос с таймаутом; «Жди меня» (`hold`) снимает и это право.
  */
 export class Question {
   private constructor(private readonly state: QuestionState) {}
@@ -58,7 +62,19 @@ export class Question {
     if (draft.recommended !== undefined && !ids.has(draft.recommended)) {
       throw new DomainError(`рекомендованный «${draft.recommended}» — не из вариантов`);
     }
-    return new Question({ ...draft, text, options, status: 'open', askedAt: now, lateAnswers: [] });
+    const { timeoutMs, ...rest } = draft;
+    if (timeoutMs !== undefined && !(Number.isSafeInteger(timeoutMs) && timeoutMs >= 0)) {
+      throw new DomainError(`таймаут ${timeoutMs} — ожидается целое число мс ≥ 0`);
+    }
+    return new Question({
+      ...rest,
+      text,
+      options,
+      status: 'open',
+      askedAt: now,
+      ...(timeoutMs !== undefined && { deadlineAt: now + timeoutMs }),
+      lateAnswers: [],
+    });
   }
 
   static restore(state: QuestionState): Question {
@@ -89,6 +105,9 @@ export class Question {
   get askedAt(): number {
     return this.state.askedAt;
   }
+  get deadlineAt(): number | undefined {
+    return this.state.deadlineAt;
+  }
   get heldAt(): number | undefined {
     return this.state.heldAt;
   }
@@ -114,6 +133,9 @@ export class Question {
   /** Решение агента без ответа человека (например, по таймауту). */
   decide(choice: Choice, reason: string, now: number): void {
     if (this.state.status !== 'open') throw new DomainError(`вопрос ${this.id} уже решён`);
+    if (this.state.deadlineAt === undefined) {
+      throw new DomainError(`вопрос ${this.id} задан без таймаута: решает человек`);
+    }
     if (this.state.heldAt !== undefined) throw new DomainError(`вопрос ${this.id}: человек просил ждать`);
     const why = reason.trim();
     if (!why) throw new DomainError('у решения нет причины');

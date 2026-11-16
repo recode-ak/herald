@@ -14,6 +14,7 @@ const db = {
     { id: 'B', text: 'Postgres' },
   ],
   recommended: 'A',
+  timeoutMs: 180_000,
 };
 
 function setup() {
