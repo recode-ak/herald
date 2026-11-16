@@ -21,7 +21,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Входящие (377e0cf)
     - [x] Тесты: виды `answer`, `late-answer`, `directive`; состояния `queued → read`; порядок выдачи; принадлежность сессии
     - [x] Реализация `src/domain/inbox`
-- [ ] Task: `docs/model.md` — сущности, состояния, правила
+- [x] Task: `docs/model.md` — сущности, состояния, правила (9d59612)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 1: Каркас и домен' (Protocol in workflow.md)
 
 ## Фаза 2: Хранилище и сценарии
