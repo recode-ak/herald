@@ -24,7 +24,7 @@ const herald = new HeraldClient({
   session,
   clock: new SystemClock(),
 });
-const channel = new HeraldChannel({ herald, log });
+const channel = new HeraldChannel({ herald, log, permissionRelay: process.env.HERALD_PERMISSION_RELAY === '1' });
 channel.onclose = () => process.exit(0);
 await channel.connect(new StdioServerTransport());
 channel.start();

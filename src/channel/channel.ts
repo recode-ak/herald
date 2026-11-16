@@ -22,6 +22,19 @@ export interface HeraldChannelOptions {
   inboxWaitMs?: number;
   /** Пауза после сбоя цикла входящих. */
   retryDelayMs?: number;
+  /**
+   * Подтверждение действий Claude Code из Telegram (`claude/channel/permission`). Выключено по умолчанию.
+   * Отвечать может только человек токена: herald принимает ответы лишь с его chat_id.
+   */
+  permissionRelay?: boolean;
+}
+
+/** Запрос Claude Code на подтверждение действия. */
+interface PermissionRequest {
+  request_id: string;
+  tool_name: string;
+  description: string;
+  input_preview: string;
 }
 
 /** Неверные аргументы инструмента. */
@@ -108,14 +121,34 @@ export class HeraldChannel {
   private readonly log: (message: string) => void;
   private running = false;
   private loop: Promise<void> | undefined;
+  /** Вопросы-подтверждения: id вопроса → request_id; решённые остаются с `undefined` (поздние ответы — не события). */
+  private readonly permissions = new Map<string, string | undefined>();
+  static readonly PREVIEW_MAX = 1_000;
 
   constructor(private readonly options: HeraldChannelOptions) {
     this.herald = options.herald;
     this.log = options.log ?? ((m) => process.stderr.write(`${m}\n`));
     this.server = new Server(
       { name: 'herald', version: '0.1.0' },
-      { capabilities: { tools: {}, experimental: { 'claude/channel': {} } }, instructions: INSTRUCTIONS },
+      {
+        capabilities: {
+          tools: {},
+          experimental: {
+            'claude/channel': {},
+            ...(options.permissionRelay && { 'claude/channel/permission': {} }),
+          },
+        },
+        instructions: INSTRUCTIONS,
+      },
     );
+    if (options.permissionRelay) {
+      // Схемы zod у этого уведомления нет — ловим его в fallback.
+      this.server.fallbackNotificationHandler = async (n) => {
+        if (n.method === 'notifications/claude/channel/permission_request') {
+          await this.askPermission(n.params as unknown as PermissionRequest);
+        }
+      };
+    }
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
     this.server.setRequestHandler(CallToolRequestSchema, async (req) =>
       this.callTool(req.params.name, (req.params.arguments ?? {}) as Record<string, unknown>),
@@ -149,13 +182,44 @@ export class HeraldChannel {
       try {
         const items = await this.herald.inbox(this.options.inboxWaitMs ?? 50_000);
         if (!this.running) return;
-        for (const item of items) await this.deliver(item);
+        for (const item of items) {
+          if (item.questionId !== undefined && this.permissions.has(item.questionId)) await this.permit(item);
+          else await this.deliver(item);
+        }
         if (items.length > 0) await this.herald.ack(items.map((i) => i.id));
       } catch (error) {
         this.log(`herald channel: входящие: ${HeraldChannel.message(error)}`);
         await Bun.sleep(this.options.retryDelayMs ?? 5_000);
       }
     }
+  }
+
+  /** Запрос подтверждения → вопрос человеку. Сбой — в лог: Claude Code всё равно спросит в терминале. */
+  private async askPermission(request: PermissionRequest): Promise<void> {
+    const preview = request.input_preview.slice(0, HeraldChannel.PREVIEW_MAX);
+    try {
+      const question = await this.herald.ask({
+        text: `🔐 Разрешить ${request.tool_name}?\n${request.description}\n\n${preview}`,
+        options: [
+          { id: 'allow', text: 'Разрешить' },
+          { id: 'deny', text: 'Запретить' },
+        ],
+      });
+      this.permissions.set(question.id, request.request_id);
+    } catch (error) {
+      this.log(`herald channel: подтверждение ${request.request_id}: ${HeraldChannel.message(error)}`);
+    }
+  }
+
+  /** Ответ на вопрос-подтверждение: «Разрешить» — allow, всё прочее — deny; поздний ответ отбрасывается. */
+  private async permit(item: InboxItemWire): Promise<void> {
+    const requestId = this.permissions.get(item.questionId as string);
+    if (item.kind !== 'answer' || requestId === undefined) return;
+    this.permissions.set(item.questionId as string, undefined);
+    await this.server.notification({
+      method: 'notifications/claude/channel/permission',
+      params: { request_id: requestId, behavior: item.option === 'allow' ? 'allow' : 'deny' },
+    });
   }
 
   private async deliver(item: InboxItemWire): Promise<void> {

@@ -172,3 +172,80 @@ describe('HeraldChannel — входящие событиями', () => {
     expect(herald.polls).toBe(polls);
   });
 });
+
+describe('HeraldChannel — подтверждение действий из Telegram', () => {
+  const request = {
+    request_id: 'abcde',
+    tool_name: 'Bash',
+    description: 'Удалить сборку',
+    input_preview: '{"command":"rm -rf dist"}',
+  };
+  const relay = (client: Client) =>
+    client.notification({ method: 'notifications/claude/channel/permission_request', params: request });
+
+  test('выключено по умолчанию: capability нет, запрос игнорируется', async () => {
+    const { client, herald } = await setup();
+    expect(client.getServerCapabilities()?.experimental?.['claude/channel/permission']).toBeUndefined();
+    await relay(client);
+    await Bun.sleep(30);
+    expect(herald.asked).toEqual([]);
+  });
+
+  test('permission_request → вопрос «разрешить / запретить» → permission allow; событием в сессию не идёт', async () => {
+    const { client, herald, channel, events, until } = await setup({ permissionRelay: true });
+    expect(client.getServerCapabilities()?.experimental?.['claude/channel/permission']).toEqual({});
+    channel.start();
+    await relay(client);
+    await until(() => herald.asked.length === 1);
+    const asked = herald.asked[0]!;
+    expect(asked.text).toContain('Bash');
+    expect(asked.text).toContain('Удалить сборку');
+    expect(asked.text).toContain('rm -rf dist');
+    expect(asked.options).toEqual([
+      { id: 'allow', text: 'Разрешить' },
+      { id: 'deny', text: 'Запретить' },
+    ]);
+
+    herald.push({
+      id: 'i_1',
+      kind: 'answer',
+      text: 'allow: Разрешить',
+      questionId: 'q_1',
+      option: 'allow',
+      createdAt: 1,
+    });
+    await until(() => herald.acked.includes('i_1'));
+    expect(events).toEqual([
+      {
+        jsonrpc: '2.0',
+        method: 'notifications/claude/channel/permission',
+        params: { request_id: 'abcde', behavior: 'allow' },
+      },
+    ]);
+  });
+
+  test('«Запретить» и свободный текст — deny; поздний ответ — не событие', async () => {
+    const { client, herald, channel, events, until } = await setup({ permissionRelay: true });
+    channel.start();
+    await relay(client);
+    await relay(client);
+    await until(() => herald.asked.length === 2);
+    herald.push(
+      { id: 'i_1', kind: 'answer', text: 'deny: Запретить', questionId: 'q_1', option: 'deny', createdAt: 1 },
+      { id: 'i_2', kind: 'answer', text: 'давай', questionId: 'q_2', createdAt: 2 },
+      { id: 'i_3', kind: 'late-answer', text: 'allow: Разрешить', questionId: 'q_1', option: 'allow', createdAt: 3 },
+    );
+    await until(() => herald.acked.length === 3);
+    expect(events.map((e) => e.params)).toEqual([
+      { request_id: 'abcde', behavior: 'deny' },
+      { request_id: 'abcde', behavior: 'deny' },
+    ]);
+  });
+
+  test('сбой ask — в лог', async () => {
+    const { client, herald, logs, until } = await setup({ permissionRelay: true });
+    herald.failNext('бот заблокирован');
+    await relay(client);
+    await until(() => logs.some((l) => l.includes('бот заблокирован')));
+  });
+});
