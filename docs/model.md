@@ -2,7 +2,7 @@
 
 Сущности, состояния и правила домена (`src/domain`). Домен синхронный, без ввода-вывода; время — мс эпохи, передаётся снаружи. Нарушение правила — `DomainError`, ошибка конфига доступа — `AccessConfigError`.
 
-Сценарии (`src/app`) — ниже, в разделах «Бот» и «Ожидание»; HTTP API и настройки сервера — в разделах «HTTP API» и «Сервер». Команды CLI и инструменты канала — появятся в фазах 4–5 трека v1.
+Сценарии (`src/app`) — ниже, в разделах «Бот» и «Ожидание»; HTTP API и настройки сервера — в разделах «HTTP API» и «Сервер». Клиент и команды CLI — в разделе «CLI»; инструменты канала появятся в фазе 5 трека v1.
 
 ## Доступ (`access.ts`)
 
@@ -118,3 +118,22 @@ Long poll без опроса базы: сценарии человека буд
 | `HERALD_TELEGRAM_API` | `https://api.telegram.org` | адрес Bot API (в тестах — фейк) |
 
 Telegram опрашивается long polling `getUpdates` (25 с); offset хранится в базе и переживает перезапуск. Сбой разбора апдейта пишется в лог, апдейт не повторяется. Bot API: сеть и 5xx — повтор с паузой, 429 — по `retry_after`, прочие 4xx — ошибка сразу.
+
+## CLI (`src/cli`, клиент — `src/client`)
+
+`herald` — тонкий слой над HTTP API для pi и любого агента с shell. Ставится `bun run link` → `~/.local/bin/herald`.
+
+Настройки — `~/.config/herald/config.json` `{ serverUrl, token, host }`; `HERALD_URL`, `HERALD_TOKEN`, `HERALD_HOST` важнее файла, `HERALD_CONFIG` — другой путь. `host` по умолчанию — имя машины. Сессия: корень git текущего каталога (вне git — сам каталог) или явное имя `--session <имя>` / `HERALD_SESSION`.
+
+| Команда | Вывод (JSON в stdout) |
+|---|---|
+| `herald notify <текст>` | `{ ok: true }` |
+| `herald status <текст>` | `{ ok: true }` — в Telegram не отправляется |
+| `herald ask <вопрос> [-o "A: текст"]… [--recommended A] [--timeout <с>]` | `{ id, status, by?, option?, text?, reason? }`; без `--timeout` ждёт бесконечно |
+| `herald decide <id> (<вариант> \| --text <текст>) --reason <причина>` | то же, `status: decided` |
+| `herald inbox [--wait <с>] [--ack]` | `[{ id, kind, text, questionId?, option?, createdAt }]`; `--ack` — сразу подтвердить выданное |
+| `herald ack <id>…` | `{ read: [id…] }` |
+
+- `ask`: `status` — `answered` (ответ человека), `decided` (решение агента), `timeout` (нет ответа); `text` у варианта — его текст.
+- Коды выхода: `0` — готово, `2` — `ask` без ответа по таймауту, `1` — ошибка (аргументы, настройки, отказ сервера; текст — в stderr).
+- Ожидание (`ask`, `inbox --wait`) — long poll кусками до своего таймаута: сбои сети и 5xx пережидаются, прочие ошибки — сразу.
