@@ -1,0 +1,1 @@
+Задача «Канал» трека question-group: src/channel/channel.ts, herald.fake.ts, тесты, test/e2e/channel.test.ts (список инструментов). Причина — spec п. 18.
