@@ -24,15 +24,14 @@ Spec — [spec.md](./spec.md), план — [plan.md](./plan.md). Трек: 2026
 | КП | Статус |
 |---|---|
 | 1–5 | ✅ смоук на реальном боте (CLI с ноутбука), e2e-тесты |
-| 6 — канал в живой сессии Claude Code | ⏳ за Нурболатом (ниже); e2e канала по stdio — зелёный |
+| 6 — канал в живой сессии Claude Code | ✅ проверил Нурболат; e2e канала по stdio |
 | 7 — неверный токен и чужой chat_id | ✅ смоук; чужой chat_id — второй аккаунт (`/start`, `/status` без ответа) и тест `human.test.ts` |
 | 8 — деплой и установка ≤ 5 команд | ✅ |
 | 9 — Автопилот на herald | ✅ (`agent-notify` удалил Нурболат) |
 
 ## За Нурболатом
 
-1. КП 6: запустить `claude --dangerously-load-development-channels server:herald` в любом проекте → написать reply боту → указание приходит в сессию; попросить агента `ask` → нажать кнопку → событие `answer`. Удобно — алиас в `~/.bashrc`.
-2. По желанию — `permissions.allow` в `~/.claude/settings.json`: `mcp__herald__reply`, `mcp__herald__notify`, `mcp__herald__ask`, `mcp__herald__decide`, `mcp__herald__status`.
+1. По желанию — `permissions.allow` в `~/.claude/settings.json`: `mcp__herald__reply`, `mcp__herald__notify`, `mcp__herald__ask`, `mcp__herald__decide`, `mcp__herald__status`.
 
 ## Решения
 

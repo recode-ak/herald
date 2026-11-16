@@ -105,7 +105,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Смоук на реальном боте — КП 1–7, результат — в git note (ded6c34)
     - [x] КП 1, 2, 3, 4, 5 и неверный токен (КП 7) — CLI с ноутбука через `https://herald.u7-hub.kz`, ответы Нурболата в Telegram
     - [x] Чужой chat_id (КП 7) — Нурболат со второго аккаунта: `/start`, `/status` — без ответа; тест `human.test.ts`
-    - [ ] КП 6 (канал в живой сессии Claude Code) — перенесён в Фазу 7, после подключения канала
+    - [x] КП 6 (канал в живой сессии Claude Code) — проверил Нурболат в Фазе 7
 - [x] Task: Conductor - User Manual Verification 'Фаза 6: Деплой и установка' (d3640e3) (Protocol in workflow.md)
 
 ## Фаза 7: Перевод Автопилота и итог [checkpoint: 74affbc]
@@ -116,7 +116,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
     - [x] Конфиг `~/.config/herald/config.json` (600) — с Фазы 6; `bun run link` → `~/.local/bin/herald`, `herald status` — ok
     - [x] `claude mcp add --scope user herald -- bun ~/dev/tools/herald/src/channel/main.ts` — ✔ Connected
     - [ ] `permissions.allow` для `mcp__herald__*` — агенту запрещено править `~/.claude/settings.json`, за Нурболатом (по желанию)
-    - [ ] КП 6 — живая сессия `claude --dangerously-load-development-channels server:herald`, за Нурболатом
+    - [x] КП 6 — живая сессия `claude --dangerously-load-development-channels server:herald` — проверил Нурболат
 - [x] Task: Инструкция «Автопилот» в `~/.pi/agent/AGENTS.md` → herald (`ask`, `status` и `inbox` на границах задач, канал в Claude Code); память агента; удалить `~/.local/bin/agent-notify` и `agent-notify.env`
     - [x] `~/.pi/agent/AGENTS.md`, «Автопилот»: п. 4 — вопросы `ask` (канал или CLI `--timeout 180`), `decide` по таймауту, «Жди меня», поздние ответы; п. 6 — `status` и `inbox --ack` на границах задач; п. 7 — `herald notify`; запасной путь — терминал
     - [x] Память агента (u7-school, `feedback-finish-then-stop`) → herald
