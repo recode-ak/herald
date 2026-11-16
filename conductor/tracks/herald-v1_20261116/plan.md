@@ -6,12 +6,12 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: `bun run check` зелёный; домен (сессия, вопрос, входящие, доступ) покрыт тестами, без ввода-вывода; `docs/model.md` описывает сущности и состояния.
 
-- [ ] Task: Каркас и базовая линия
-    - [ ] `package.json` (скрипты `test`, `lint`, `typecheck`, `check`, `link`), `tsconfig.json` (strict), `biome.json`, `LICENSE` (MIT-0) — по образцу chronicle
-    - [ ] Базовая линия: `bun run check` зелёный на пустом наборе, результат — в git note
-- [ ] Task: Доступ — люди и токены
-    - [ ] Тесты: разбор `HERALD_TOKENS` и `HERALD_PEOPLE` (корректные строки, пустые, дубли, человек без chat_id); поиск человека по токену и по chat_id
-    - [ ] Реализация `src/domain/access`
+- [x] Task: Каркас и базовая линия (2e9582e)
+    - [x] `package.json` (скрипты `test`, `lint`, `typecheck`, `check`, `link`), `tsconfig.json` (strict), `biome.json`, `LICENSE` (MIT-0) — по образцу chronicle
+    - [x] Базовая линия: `bun run check` зелёный на пустом наборе, результат — в git note
+- [x] Task: Доступ — люди и токены (2e9582e)
+    - [x] Тесты: разбор `HERALD_TOKENS` и `HERALD_PEOPLE` (корректные строки, пустые, дубли, человек без chat_id); поиск человека по токену и по chat_id
+    - [x] Реализация `src/domain/access`
 - [ ] Task: Сессия
     - [ ] Тесты: ключ `host + корень` / явный `--session`, имя проекта из корня, статус с временем, активность по последнему обращению, «активна» — в пределах окна
     - [ ] Реализация `src/domain/session`
