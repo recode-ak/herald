@@ -1,4 +1,5 @@
 import type { AskRequest } from '../client/client.ts';
+import type { InboxKind } from '../domain/inbox.ts';
 import type { Choice } from '../domain/question.ts';
 import type { InboxItemWire, QuestionWire } from '../http/wire.ts';
 import type { ChannelHerald } from './channel.ts';
@@ -14,6 +15,10 @@ export class FakeHerald implements ChannelHerald {
   readonly acked: string[] = [];
   /** Сколько раз спрашивали входящие. */
   polls = 0;
+  /** Виды из последнего запроса входящих. */
+  lastKinds: readonly InboxKind[] = [];
+  /** Порядок вызовов ack и bye. */
+  readonly calls: string[] = [];
   private queue: InboxItemWire[] = [];
   private failure: string | undefined;
   private wake: (() => void) | undefined;
@@ -42,6 +47,7 @@ export class FakeHerald implements ChannelHerald {
   async bye(): Promise<void> {
     this.maybeFail();
     this.byes++;
+    this.calls.push('bye');
   }
 
   async title(text: string): Promise<void> {
@@ -68,11 +74,13 @@ export class FakeHerald implements ChannelHerald {
     return { id, text: '', options: [], status: 'decided', askedAt: 0, lateAnswers: [] };
   }
 
-  /** Непрочитанные; если их нет — ждёт `push` не дольше 20 мс (короткий long poll). */
-  async inbox(_waitMs?: number): Promise<InboxItemWire[]> {
+  /** Непрочитанные (`kinds` — только этих видов); если их нет — ждёт `push` не дольше 20 мс (короткий long poll). */
+  async inbox(_waitMs?: number, kinds: readonly InboxKind[] = []): Promise<InboxItemWire[]> {
     this.polls++;
+    this.lastKinds = kinds;
     this.maybeFail();
-    if (this.queue.length === 0) {
+    const pending = () => this.queue.filter((i) => kinds.length === 0 || kinds.includes(i.kind));
+    if (pending().length === 0) {
       await new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, 20);
         this.wake = () => {
@@ -82,13 +90,14 @@ export class FakeHerald implements ChannelHerald {
       });
       this.wake = undefined;
     }
-    return [...this.queue];
+    return pending();
   }
 
   async ack(ids: readonly string[]): Promise<string[]> {
     this.maybeFail();
     this.queue = this.queue.filter((i) => !ids.includes(i.id));
     this.acked.push(...ids);
+    this.calls.push('ack');
     return [...ids];
   }
 
