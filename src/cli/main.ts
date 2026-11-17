@@ -9,5 +9,6 @@ const cli = new Cli({
   clock: new SystemClock(),
   out: (text) => process.stdout.write(text),
   err: (text) => process.stderr.write(text),
+  stdin: () => Bun.stdin.text(),
 });
 process.exit(await cli.run(process.argv.slice(2)));

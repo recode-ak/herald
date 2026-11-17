@@ -11,6 +11,7 @@ import { SessionLocator } from '../client/locator.ts';
 import type { Choice, QuestionOption, Resolution } from '../domain/question.ts';
 import type { QuestionWire } from '../http/wire.ts';
 import { Args, type ArgsSpec, UsageError } from './args.ts';
+import { TerminalCommands } from './terminal.ts';
 
 export interface CliDeps {
   env: Record<string, string | undefined>;
@@ -18,6 +19,8 @@ export interface CliDeps {
   clock: Clock;
   out: (text: string) => void;
   err: (text: string) => void;
+  /** Весь stdin процесса (`herald hook`); нет — пусто. */
+  stdin?: () => Promise<string>;
 }
 
 /** Ответ на пункт в выводе CLI. */
@@ -67,6 +70,8 @@ const USAGE = `herald — вопросы и уведомления челове�
   herald inbox [--wait <с>] [--ack]             входящие: ответы, поздние ответы, указания,
                                                 переводы в терминал
   herald ack <id>…                              подтвердить прочтение входящих
+  herald hook                                   хук Claude Code (Stop, SessionStart): JSON хука
+                                                из stdin → метка окна tmux; всегда код 0
 
   Общие: --session <имя> (или HERALD_SESSION) — явная сессия вместо корня git.
   Вывод — JSON в stdout. Коды: 0 — готово, 2 — ask без ответа по таймауту,
@@ -106,6 +111,8 @@ export class Cli {
           return await this.inbox(rest);
         case 'ack':
           return await this.ack(rest);
+        case 'hook':
+          return await this.terminal().hook();
         default:
           throw new UsageError(command ? `неизвестная команда «${command}»` : 'нужна команда');
       }
@@ -205,6 +212,15 @@ export class Cli {
     const args = this.parse(argv, {});
     if (args.positional.length === 0) throw new UsageError('ack: нужен хотя бы один id');
     return this.print({ read: await this.client(args).ack(args.positional) });
+  }
+
+  private terminal(): TerminalCommands {
+    return new TerminalCommands({
+      env: this.deps.env,
+      now: () => this.deps.clock.now(),
+      err: this.deps.err,
+      stdin: this.deps.stdin ?? (async () => ''),
+    });
   }
 
   private parse(argv: readonly string[], spec: ArgsSpec): Args {
