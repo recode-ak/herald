@@ -12,7 +12,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Хранилище — таблицы машин, запусков и диалогов (миграция v7), порт `Store`, очистка (2cfef6b)
 - [x] Task: Conductor - User Manual Verification 'Фаза 1: Домен и хранилище' (fd2e5ed) (Protocol in workflow.md)
 
-## Фаза 2: Сценарии сервера и API
+## Фаза 2: Сценарии сервера и API [checkpoint: 19f928d]
 
 Критерии фазы: `bun run check` зелёный; требования 3, 4, 7 покрыты тестами; `docs/model.md` — сервер.
 
@@ -20,7 +20,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: HTTP — `/v1/host/poll`, `/v1/host/done` (391ece6)
 - [x] Task: Бот — диалог `/new` (машина → каталог → задача), `/cancel`, подсказки команд (9316b37)
 - [x] Task: Документы — `docs/model.md` (сервер: машина, запуск, API, бот, хранение) (2013f77)
-- [ ] Task: Conductor - User Manual Verification 'Фаза 2: Сценарии сервера и API' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 2: Сценарии сервера и API' (19f928d) (Protocol in workflow.md)
 
 ## Фаза 3: Демон и канал
 
