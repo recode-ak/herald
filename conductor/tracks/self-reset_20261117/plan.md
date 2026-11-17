@@ -16,7 +16,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: документы обновлены; хуки настроены; проверка в отдельном окне Claude Code в tmux пройдена.
 
-- [ ] Task: Документы — `docs/model.md`, `docs/install.md`
+- [x] Task: Документы — `docs/model.md`, `docs/install.md` (bc135a7)
 - [ ] Task: Хуки в `~/.claude/settings.json`, ручная проверка в отдельном окне
 - [ ] Task: Автопилот — п. 5 глобального `AGENTS.md`
 - [ ] Task: Conductor - User Manual Verification 'Фаза 2: Документы и настройка' (Protocol in workflow.md)
