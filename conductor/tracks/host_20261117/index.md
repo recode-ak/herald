@@ -1,4 +1,5 @@
 # Track host_20261117 Context
 
-- [Спецификация (черновик)](./spec.md)
+- [Спецификация](./spec.md)
+- [План](./plan.md)
 - [Метаданные](./metadata.json)

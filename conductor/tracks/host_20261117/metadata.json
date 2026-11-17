@@ -1,8 +1,8 @@
 {
   "track_id": "host_20261117",
   "type": "feature",
-  "status": "new",
+  "status": "in_progress",
   "created_at": "2026-11-17T18:00:00Z",
-  "updated_at": "2026-11-17T18:00:00Z",
+  "updated_at": "2026-11-17T20:00:00Z",
   "description": "Окна агентов без активного агента: демон машины herald host (systemd --user), команды бота /new и /exit"
 }
