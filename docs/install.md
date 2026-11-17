@@ -124,6 +124,8 @@ claude() {
 
 Хук работает только в tmux (`TMUX_PANE`), ничего не печатает и всегда завершается с кодом 0 — окну не мешает. Claude Code должен быть запущен в tmux; без хуков `herald self` работает только с `--delay`.
 
+Новые окна агентов (`herald spawn`) открываются в tmux-сессии `agents` — `tmux attach -t agents`. Нужен tmux ≥ 3.0 (команда окна — без shell) и `claude` в `PATH`.
+
 ## Расширение для pi
 
 Пакет `integrations/pi`: на время сессии pi сообщения из Telegram (указания, поздние ответы) приходят в сессию сами, `/clear` и `/compact` из Telegram выполняются, сессия видна в `/sessions`, пока pi открыт. Настройки — те же, что у CLI; CLI в bash этой сессии pi пишет в тот же ящик (`PI_SESSION_ID`). Подробности — `docs/model.md` «Расширение pi».

@@ -245,6 +245,15 @@ describe('HeraldChannel — инструменты', () => {
     expect(client.getInstructions()).toContain('kind="hold"');
   });
 
+  test('инструкции: окна агентов — herald spawn, закрыть своё — herald self /exit, самосброс — herald self', async () => {
+    for (const events of [true, false]) {
+      const { client } = await setup({ events });
+      expect(client.getInstructions()).toContain('herald spawn');
+      expect(client.getInstructions()).toContain('herald self /exit');
+      expect(client.getInstructions()).toContain('herald self /clear');
+    }
+  });
+
   test('неверные аргументы и ошибка сервера — isError с текстом', async () => {
     const { herald, call } = await setup();
     expect(await call('reply', {})).toMatchObject({ isError: true, text: expect.stringContaining('text') });
