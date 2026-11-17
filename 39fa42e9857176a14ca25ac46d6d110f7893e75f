@@ -1,0 +1,1 @@
+Задача: Терминал — многострочный текст вставкой. TmuxTerminal перенесён в src/terminal/ (нужен и CLI, не только каналу), интерфейс Terminal — src/terminal/terminal.ts. Многострочный текст: set-buffer + paste-buffer -p -d, затем Enter. Файлы: src/terminal/{tmux,tmux.test,terminal}.ts, src/channel/{channel,channel.test,main}.ts.
