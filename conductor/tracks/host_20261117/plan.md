@@ -32,7 +32,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Документы — `docs/model.md` (CLI, канал), `docs/install.md` (unit `systemd --user`, linger) (f836b32)
 - [x] Task: Conductor - User Manual Verification 'Фаза 3: Демон и канал' (1ba8872) (Protocol in workflow.md)
 
-## Фаза 4: Выкатка и живая проверка
+## Фаза 4: Выкатка и живая проверка [checkpoint: 92d9000]
 
 Критерии фазы: сервер выкачен (с подтверждения Нурболата), служба на машине, `/new` и `/exit` работают вживую.
 
