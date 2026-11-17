@@ -107,6 +107,23 @@ claude() {
 - Вопросы-подтверждения живут в процессе канала: после перезапуска Claude Code ответ на старый запрос придёт обычным событием `answer`.
 - Логи канала — только в stderr (stdout занят MCP).
 
+## Самосброс агента: хуки Claude Code
+
+`herald self` (`docs/model.md` «Самосброс») узнаёт о конце хода и сброса от хуков. В `~/.claude/settings.json` (для всех проектов):
+
+```json
+{
+  "hooks": {
+    "Stop": [{ "hooks": [{ "type": "command", "command": "$HOME/.local/bin/herald hook" }] }],
+    "SessionStart": [
+      { "matcher": "clear|compact", "hooks": [{ "type": "command", "command": "$HOME/.local/bin/herald hook" }] }
+    ]
+  }
+}
+```
+
+Хук работает только в tmux (`TMUX_PANE`), ничего не печатает и всегда завершается с кодом 0 — окну не мешает. Claude Code должен быть запущен в tmux; без хуков `herald self` работает только с `--delay`.
+
 ## Расширение для pi
 
 Пакет `integrations/pi`: на время сессии pi сообщения из Telegram (указания, поздние ответы) приходят в сессию сами, `/clear` и `/compact` из Telegram выполняются, сессия видна в `/sessions`, пока pi открыт. Настройки — те же, что у CLI; CLI в bash этой сессии pi пишет в тот же ящик (`PI_SESSION_ID`). Подробности — `docs/model.md` «Расширение pi».
