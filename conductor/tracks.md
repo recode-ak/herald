@@ -16,3 +16,8 @@
 
 - [x] **Track: Пачка вопросов по очереди: «Жди меня» на пачку и «В терминал»**
 *Link: [./tracks/question-group_20261117/](./tracks/question-group_20261117/)*
+
+---
+
+- [~] **Track: Самосброс агента: herald self — команда в своё окно tmux и сообщение для продолжения**
+*Link: [./tracks/self-reset_20261117/](./tracks/self-reset_20261117/)*
