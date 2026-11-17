@@ -1,0 +1,1 @@
+Задача: Домен — команда /exit. Изменено: src/domain/inbox.ts (COMMANDS + /exit), src/domain/inbox.test.ts. Причина: решение Нурболата — /exit мягко, как /clear (q_eduvumvqro, п.2).
