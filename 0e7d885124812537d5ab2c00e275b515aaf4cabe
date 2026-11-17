@@ -1,0 +1,1 @@
+Задача: Канал и документы. Инструкции канала (оба режима): «открой окно» — herald spawn, «закройся» — herald self /exit, самосброс — herald self /clear --message. docs/model.md — строка herald spawn и раздел «Окна агентов»; docs/install.md — сессия agents, tmux ≥ 3.0.
