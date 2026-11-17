@@ -1,0 +1,1 @@
+Задача: Терминал. TmuxTerminal.screen() (capture-pane -p), press(...keys) (send-keys без Ctrl+U); TmuxRun возвращает stdout.
