@@ -1,0 +1,5 @@
+Проверка Фазы 2 «Сценарии сервера и API» (Автопилот: ручная проверка считается пройденной).
+Автотесты: CI=true bun test --coverage — 535 pass, 0 fail; покрытие всех файлов 97.8% строк; host.ts, new-window.ts, messages.ts, wire.ts — 100%. bun run check зелёный.
+У всех изменённых кодовых файлов фазы есть тесты.
+Требования spec: 3 (HTTP /v1/host/*) — api.test.ts; 4 (диалог /new) — new-window.test.ts; 7 (подсказки) — new-window.test.ts, human.test.ts.
+План ручной проверки (выполнится вживую в Фазе 4): 1) curl -H 'Authorization: Bearer <токен>' -d '{"session":{"host":"laptop","root":"/x"},"waitMs":1000}' <сервер>/v1/host/poll → {"launches":[]}; 2) в Telegram /new → кнопки/шаг каталога; ввести ~/herald-livetest и задачу → «⏳ Открываю окно на laptop…»; 3) повторный poll → запуск; /v1/host/done {id, ok:true, text} → reply «🪟 Окно открыто…»; 4) /cancel в диалоге → «✖ Новое окно отменено.»
