@@ -38,7 +38,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 - [x] Task: Выкатка сервера по `docs/deploy.md` — только после `ask` без таймаута (1119143)
 - [x] Task: Служба `herald-host` на машине по `docs/install.md` (вне репо)
-- [~] Task: Живая проверка — `/new` в `~/herald-livetest`, задача, `/sessions`, `/exit`
+- [x] Task: Живая проверка — `/new` в `~/herald-livetest`, задача, `/sessions`, `/exit` (живьём)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 4: Выкатка и живая проверка' (Protocol in workflow.md)
 
 ## Заметки к реализации (тактика, решено по ходу)
