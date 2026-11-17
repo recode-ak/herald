@@ -1,8 +1,10 @@
 import { join } from 'node:path';
 import type { Clock } from '../app/ports.ts';
+import { AgentLauncher, LaunchError } from '../terminal/launcher.ts';
 import { SelfReset } from '../terminal/reset.ts';
 import { HookSignals } from '../terminal/signals.ts';
 import type { Terminal } from '../terminal/terminal.ts';
+import type { TmuxRun } from '../terminal/tmux.ts';
 import { type Args, UsageError } from './args.ts';
 
 type Env = Record<string, string | undefined>;
@@ -20,11 +22,17 @@ export interface TerminalCommandsDeps {
   terminal: (pane: string) => Terminal;
   /** Уведомление человеку (herald notify). */
   notify: (text: string) => Promise<void>;
+  tmux: TmuxRun;
+  /** Полный путь к `claude`; не найден — `undefined`. */
+  claude: () => string | undefined;
+  cwd: string;
 }
 
-/** Команды CLI про окно агента в tmux: `herald hook` (метки хуков Claude Code) и `herald self` (самосброс). */
+/** Команды CLI про окна агентов в tmux: `herald hook` (метки хуков), `herald self` (самосброс), `herald spawn` (новое окно). */
 export class TerminalCommands {
   static readonly DEFAULT_TIMEOUT_S = 600;
+  static readonly SPAWN_TIMEOUT_S = 60;
+  static readonly SPAWN_SESSION = 'agents';
 
   constructor(private readonly deps: TerminalCommandsDeps) {}
 
@@ -92,6 +100,37 @@ export class TerminalCommands {
     });
     this.print(outcome);
     return outcome.ok ? 0 : 1;
+  }
+
+  /** Новое окно агента (`AgentLauncher`): Claude Code с каналом в tmux-сессии `agents`. */
+  async spawn(args: Args): Promise<number> {
+    const [dir, ...extra] = args.positional;
+    if (!dir || extra.length > 0) throw new UsageError('spawn: нужен один каталог (задача — в --prompt)');
+    const claude = this.deps.claude();
+    const home = this.deps.env.HOME;
+    try {
+      if (!claude) throw new LaunchError('claude не найден в PATH');
+      if (!home) throw new LaunchError('нет HOME');
+      const prompt = args.value('prompt');
+      const launched = await new AgentLauncher({
+        tmux: this.deps.tmux,
+        home,
+        cwd: this.deps.cwd,
+        claude,
+        clock: this.deps.clock,
+      }).launch({
+        dir,
+        ...(prompt !== undefined && { prompt }),
+        tmuxSession: args.value('tmux') ?? TerminalCommands.SPAWN_SESSION,
+        timeoutMs: args.seconds('timeout') ?? TerminalCommands.SPAWN_TIMEOUT_S * 1_000,
+      });
+      this.print({ ok: true, ...launched });
+      return 0;
+    } catch (error) {
+      if (!(error instanceof LaunchError)) throw error;
+      this.deps.err(`herald spawn: ${error.message}\n`);
+      return 1;
+    }
   }
 
   private pane(): string | undefined {

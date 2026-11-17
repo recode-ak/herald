@@ -11,7 +11,7 @@ import { SessionLocator } from '../client/locator.ts';
 import type { Choice, QuestionOption, Resolution } from '../domain/question.ts';
 import type { QuestionWire } from '../http/wire.ts';
 import type { Terminal } from '../terminal/terminal.ts';
-import { TmuxTerminal } from '../terminal/tmux.ts';
+import { type TmuxRun, TmuxTerminal } from '../terminal/tmux.ts';
 import { Args, type ArgsSpec, UsageError } from './args.ts';
 import { TerminalCommands } from './terminal.ts';
 
@@ -27,6 +27,10 @@ export interface CliDeps {
   detach?: (argv: string[], log: string) => Promise<void>;
   /** Терминал панели tmux (`herald self`); по умолчанию — `TmuxTerminal`. */
   terminal?: (pane: string) => Terminal;
+  /** Запуск tmux (`herald spawn`); по умолчанию — `TmuxTerminal.run`. */
+  tmux?: TmuxRun;
+  /** Полный путь к `claude` (`herald spawn`); по умолчанию — из `PATH`. */
+  claude?: () => string | undefined;
 }
 
 /** Ответ на пункт в выводе CLI. */
@@ -83,6 +87,11 @@ const USAGE = `herald — вопросы и уведомления челове�
                                                 (срок каждого — --timeout, по умолчанию 600 с),
                                                 без хуков — --delay: сообщение через N с.
                                                 Идёт фоном, сразу отвечает; не вышло — notify
+  herald spawn <каталог> [--prompt <задача>] [--tmux <сессия>] [--timeout <с>]
+                                                новое окно агента: Claude Code с каналом herald
+                                                в tmux-сессии agents (каталог — внутри домашнего),
+                                                задача — первым сообщением; закрыть окно —
+                                                herald self /exit из него
   herald hook                                   хук Claude Code (Stop, SessionStart): JSON хука
                                                 из stdin → метка окна tmux; всегда код 0
 
@@ -126,6 +135,10 @@ export class Cli {
           return await this.ack(rest);
         case 'hook':
           return await this.terminal().hook();
+        case 'spawn': {
+          const args = this.parse(rest, { values: ['prompt', 'tmux', 'timeout'] });
+          return await this.terminal(args).spawn(args);
+        }
         case 'self': {
           const args = this.parse(rest, { values: ['message', 'timeout', 'delay'], switches: ['foreground'] });
           return await this.terminal(args).self(args);
@@ -245,6 +258,9 @@ export class Cli {
           throw new Error('запуск фоном недоступен');
         }),
       terminal: this.deps.terminal ?? ((pane) => new TmuxTerminal(pane)),
+      tmux: this.deps.tmux ?? TmuxTerminal.run,
+      claude: this.deps.claude ?? (() => Bun.which('claude') ?? undefined),
+      cwd: this.deps.cwd,
       notify: (text) => this.client(args ?? this.parse([], {})).notify(text),
     });
   }

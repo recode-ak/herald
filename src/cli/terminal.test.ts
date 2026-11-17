@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SystemClock } from '../infra/system.ts';
@@ -146,5 +146,72 @@ describe('herald self', () => {
       expect(result.code).toBe(1);
       expect(result.detached).toEqual([]);
     }
+  });
+});
+
+describe('herald spawn', () => {
+  let home: string;
+  beforeEach(() => {
+    home = realpathSync(mkdtempSync(join(tmpdir(), 'herald-home-')));
+    mkdirSync(join(home, 'dev', 'u7-hub'), { recursive: true });
+  });
+  afterEach(() => rmSync(home, { recursive: true, force: true }));
+
+  const run = async (args: string[], claude: string | null = '/bin/claude') => {
+    let stdout = '';
+    let stderr = '';
+    const calls: string[][] = [];
+    const code = await new Cli({
+      env: { HOME: home },
+      cwd: home,
+      clock: new SystemClock(),
+      out: (s) => {
+        stdout += s;
+      },
+      err: (s) => {
+        stderr += s;
+      },
+      tmux: async (a) => {
+        calls.push(a);
+        if (a[0] === 'new-session' || a[0] === 'new-window') return '%42 @7';
+        if (a[0] === 'capture-pane') return '▎ Channels (experimental) messages';
+        return '';
+      },
+      claude: () => claude ?? undefined,
+    }).run(['spawn', ...args]);
+    return { code, stdout, stderr, calls };
+  };
+
+  test('окно в сессии agents с задачей; вывод — панель, окно, каталог', async () => {
+    const result = await run(['~/dev/u7-hub', '--prompt', 'Сделай X']);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({
+      ok: true,
+      pane: '%42',
+      window: '@7',
+      dir: join(home, 'dev', 'u7-hub'),
+    });
+    const create = result.calls.find((c) => c[0] === 'new-window' || c[0] === 'new-session');
+    expect(create).toContain('=agents:');
+    expect(create?.slice(-2)).toEqual(['--', 'Сделай X']);
+  });
+
+  test('--tmux — другая сессия', async () => {
+    const result = await run(['~/dev/u7-hub', '--tmux', 'work']);
+    expect(result.calls.find((c) => c[0] === 'has-session')).toEqual(['has-session', '-t', '=work']);
+  });
+
+  test('каталог вне домашнего или без каталога — код 1, окно не открыто', async () => {
+    for (const args of [['/etc'], []]) {
+      const result = await run(args);
+      expect(result.code).toBe(1);
+      expect(result.calls.some((c) => c[0] === 'new-window' || c[0] === 'new-session')).toBe(false);
+    }
+  });
+
+  test('claude не найден в PATH — код 1', async () => {
+    const result = await run(['~/dev/u7-hub'], null);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('claude');
   });
 });
