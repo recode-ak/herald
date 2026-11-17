@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { AgentService } from '../app/agent.ts';
+import { HostService } from '../app/host.ts';
 import { HumanService } from '../app/human.ts';
 import type { Clock, Ids } from '../app/ports.ts';
 import { Waiter } from '../app/waiter.ts';
@@ -38,7 +39,8 @@ export class HeraldServer {
 
     const agent = new AgentService(deps);
     const human = new HumanService(deps);
-    const http = new HttpApi({ agent, access: config.access, maxWaitMs: config.maxWaitMs, log }).listen({
+    const host = new HostService(deps);
+    const http = new HttpApi({ agent, host, access: config.access, maxWaitMs: config.maxWaitMs, log }).listen({
       port: config.port,
       hostname: config.hostname,
     });

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { Launch } from '../domain/host.ts';
 import { InboxItem } from '../domain/inbox.ts';
 import { Question } from '../domain/question.ts';
 import { Wire } from './wire.ts';
@@ -79,5 +80,14 @@ describe('Wire', () => {
       option: 'A',
       createdAt: 9,
     });
+  });
+
+  test('запуск — то, что нужно демону: id, каталог, задача, время создания', () => {
+    const launch = Launch.create(
+      { id: 'l_1', person: 'nur', host: 'laptop', dir: 'dev/x', prompt: 'задача', chatId: 1, messageId: 2 },
+      9,
+    );
+    launch.take(10);
+    expect(Wire.launch(launch)).toEqual({ id: 'l_1', dir: 'dev/x', prompt: 'задача', createdAt: 9 });
   });
 });

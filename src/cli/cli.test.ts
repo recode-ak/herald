@@ -3,6 +3,7 @@ import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AgentService } from '../app/agent.ts';
+import { HostService } from '../app/host.ts';
 import { HumanService } from '../app/human.ts';
 import { FakeTelegram } from '../app/telegram.fake.ts';
 import { NUR_CHAT, SeqIds } from '../app/testkit.fake.ts';
@@ -32,7 +33,12 @@ function setup() {
     timeZone: 'Asia/Oral',
   };
   const human = new HumanService(deps);
-  const server = new HttpApi({ agent: new AgentService(deps), access: deps.access, maxWaitMs: 40 }).listen({
+  const server = new HttpApi({
+    agent: new AgentService(deps),
+    host: new HostService(deps),
+    access: deps.access,
+    maxWaitMs: 40,
+  }).listen({
     port: 0,
     hostname: '127.0.0.1',
   });

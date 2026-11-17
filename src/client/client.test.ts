@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { AgentService } from '../app/agent.ts';
+import { HostService } from '../app/host.ts';
 import { HumanService } from '../app/human.ts';
 import { FakeTelegram } from '../app/telegram.fake.ts';
 import { NUR_CHAT, SeqIds } from '../app/testkit.fake.ts';
@@ -36,7 +37,12 @@ function setup(maxWaitMs = 40) {
   };
   const human = new HumanService(deps);
   const calls: string[] = [];
-  const api = new HttpApi({ agent: new AgentService(deps), access: deps.access, maxWaitMs });
+  const api = new HttpApi({
+    agent: new AgentService(deps),
+    host: new HostService(deps),
+    access: deps.access,
+    maxWaitMs,
+  });
   const server = Bun.serve({
     port: 0,
     hostname: '127.0.0.1',

@@ -31,6 +31,12 @@ export class RequestBody {
     return this.data[name] === undefined ? undefined : this.string(name);
   }
 
+  boolean(name: string): boolean {
+    const value = this.data[name];
+    if (typeof value !== 'boolean') throw new BadRequestError(`поле «${name}» — ожидается true или false`);
+    return value;
+  }
+
   /** Неотрицательное целое (мс ожидания); нет поля — 0. */
   waitMs(name = 'waitMs'): number {
     const value = this.data[name];

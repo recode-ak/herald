@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { AgentService } from '../app/agent.ts';
+import { HostService } from '../app/host.ts';
 import { HumanService } from '../app/human.ts';
 import { NUR_CHAT, testkit } from '../app/testkit.fake.ts';
+import { Waiter } from '../app/waiter.ts';
+import { Launch } from '../domain/host.ts';
 import { HttpApi } from './api.ts';
-import type { InboxItemWire, QuestionWire } from './wire.ts';
+import type { InboxItemWire, LaunchWire, QuestionWire } from './wire.ts';
 
 const session = { host: 'laptop', root: '/home/nur/dev/u7-school' };
 const db = {
@@ -25,7 +28,7 @@ function setup(maxWaitMs = 30_000) {
   const kit = testkit();
   const agent = new AgentService(kit);
   const human = new HumanService(kit);
-  const api = new HttpApi({ agent, access: kit.access, maxWaitMs });
+  const api = new HttpApi({ agent, host: new HostService(kit), access: kit.access, maxWaitMs });
   const server = api.listen({ port: 0, hostname: '127.0.0.1' });
   servers.push(server);
   const base = `http://127.0.0.1:${server.port}`;
@@ -396,5 +399,62 @@ describe('Статус и входящие', () => {
     const k = setup();
     await k.call('/v1/notify', { session: { ...session, name: 'ночь' }, text: 'x' });
     expect(k.telegram.last(NUR_CHAT)?.text).toBe('[laptop · ночь]\nx');
+  });
+});
+
+describe('Машина (демон herald host)', () => {
+  const launch = (k: ReturnType<typeof setup>, id: string) =>
+    k.store.saveLaunch(
+      Launch.create(
+        { id, person: 'nur', host: 'laptop', dir: 'dev/x', prompt: 'задача', chatId: NUR_CHAT, messageId: 7 },
+        k.clock.now(),
+      ),
+    );
+
+  test('poll — невыданные запуски машины сессии; машина отмечена', async () => {
+    const k = setup();
+    launch(k, 'l_1');
+    const res = await k.call('/v1/host/poll', { session });
+    expect(res.status).toBe(200);
+    expect(res.json.launches as LaunchWire[]).toEqual([
+      { id: 'l_1', dir: 'dev/x', prompt: 'задача', createdAt: k.clock.now() },
+    ]);
+    expect(k.store.host('nur', 'laptop')?.lastSeenAt).toBe(k.clock.now());
+    expect((await k.call('/v1/host/poll', { session })).json.launches).toEqual([]);
+  });
+
+  test('poll ждёт до waitMs (не дольше maxWaitMs) и просыпается на новый запуск', async () => {
+    const k = setup(1_000);
+    const waiting = k.call('/v1/host/poll', { session, waitMs: 60_000 });
+    await k.sleeping();
+    launch(k, 'l_1');
+    k.waiter.notify(Waiter.hostTopic('nur', 'laptop'));
+    expect(((await waiting).json.launches as LaunchWire[]).map((l) => l.id)).toEqual(['l_1']);
+
+    const idle = k.call('/v1/host/poll', { session, waitMs: 60_000 });
+    await k.sleeping();
+    k.clock.advance(1_000);
+    expect((await idle).json.launches).toEqual([]);
+  });
+
+  test('done — итог reply человеку; без ok или text — 400; чужой — 403; повтор — 400', async () => {
+    const k = setup();
+    launch(k, 'l_1');
+    await k.call('/v1/host/poll', { session });
+
+    expect((await k.call('/v1/host/done', { session, id: 'l_1', text: 'x' })).status).toBe(400);
+    expect((await k.call('/v1/host/done', { session, id: 'l_1', ok: 'да', text: 'x' })).status).toBe(400);
+    const alien = await k.call(
+      '/v1/host/done',
+      { session: { host: 'laptop', root: '/x' }, id: 'l_1', ok: true, text: 'x' },
+      't-ann',
+    );
+    expect(alien.status).toBe(403);
+
+    const res = await k.call('/v1/host/done', { session, id: 'l_1', ok: true, text: 'agents:2' });
+    expect(res).toEqual({ status: 200, json: { ok: true } });
+    expect(k.telegram.last(NUR_CHAT)).toMatchObject({ text: '🪟 Окно открыто на laptop: agents:2', replyTo: 7 });
+    expect((await k.call('/v1/host/done', { session, id: 'l_1', ok: true, text: 'x' })).status).toBe(400);
+    expect((await k.call('/v1/host/done', { session, id: 'l_9', ok: true, text: 'x' })).status).toBe(404);
   });
 });

@@ -1,4 +1,5 @@
 import type { AgentService } from '../app/agent.ts';
+import type { HostService } from '../app/host.ts';
 import { type Caller, ForbiddenError, NotFoundError } from '../app/ports.ts';
 import { TelegramError } from '../app/telegram.ts';
 import type { Access } from '../domain/access.ts';
@@ -10,6 +11,8 @@ import { Wire } from './wire.ts';
 
 export interface HttpApiDeps {
   agent: AgentService;
+  /** Демон машины (`herald host`): машина — `session.host` вызывающего. */
+  host: HostService;
   access: Access;
   /** Потолок одного long poll: дольше клиент переподключается сам. */
   maxWaitMs: number;
@@ -26,7 +29,7 @@ class UnauthorizedError extends Error {
 }
 
 /**
- * HTTP API агента: `POST /v1/<действие>`, JSON, `Authorization: Bearer <токен>`; `GET /health` — без токена.
+ * HTTP API агента и демона машины (`/v1/host/*`): `POST /v1/<действие>`, JSON, `Authorization: Bearer <токен>`; `GET /health` — без токена.
  * Сессия вызывающего — поле `session` тела. Ожидание (`waitMs`) ограничено `maxWaitMs`.
  */
 export class HttpApi {
@@ -38,7 +41,7 @@ export class HttpApi {
     if (!Number.isSafeInteger(deps.maxWaitMs) || deps.maxWaitMs <= 0 || deps.maxWaitMs > HttpApi.MAX_WAIT_LIMIT_MS) {
       throw new RangeError(`maxWaitMs — от 1 до ${HttpApi.MAX_WAIT_LIMIT_MS}`);
     }
-    const { agent } = deps;
+    const { agent, host } = deps;
     this.routes = new Map<string, Handler>([
       ['/v1/notify', (c, b) => agent.notify(c, b.string('text'))],
       [
@@ -83,6 +86,8 @@ export class HttpApi {
         },
       ],
       ['/v1/ack', async (c, b) => ({ read: await agent.ack(c, b.strings('ids')) })],
+      ['/v1/host/poll', async (c, b) => ({ launches: (await host.poll(c, this.wait(b))).map(Wire.launch) })],
+      ['/v1/host/done', (c, b) => host.done(c, b.string('id'), { ok: b.boolean('ok'), text: b.string('text') })],
     ]);
   }
 

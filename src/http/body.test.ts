@@ -18,6 +18,14 @@ describe('RequestBody', () => {
     expect(() => b.optionalString('n')).toThrow(BadRequestError);
   });
 
+  test('boolean: только true/false', async () => {
+    const b = await read(JSON.stringify({ ok: false, n: 1 }));
+    expect(b.boolean('ok')).toBe(false);
+    expect((await read('{"ok":true}')).boolean('ok')).toBe(true);
+    expect(() => b.boolean('n')).toThrow('«n»');
+    expect(() => b.boolean('нет')).toThrow(BadRequestError);
+  });
+
   test('waitMs: нет — 0; только целое ≥ 0', async () => {
     expect((await read('{}')).waitMs()).toBe(0);
     expect((await read('{"waitMs":1500}')).waitMs()).toBe(1500);

@@ -1,3 +1,4 @@
+import type { Launch } from '../domain/host.ts';
 import type { InboxItem, InboxKind } from '../domain/inbox.ts';
 import type { Question, QuestionItem, QuestionOption, QuestionStatus, Resolution } from '../domain/question.ts';
 
@@ -29,6 +30,14 @@ export interface InboxItemWire {
   text: string;
   questionId?: string;
   option?: string;
+  createdAt: number;
+}
+
+/** Запуск окна в ответе `/v1/host/poll`: что открыть демону. Каталог — как ввёл человек (от `~`). */
+export interface LaunchWire {
+  id: string;
+  dir: string;
+  prompt: string;
   createdAt: number;
 }
 
@@ -64,5 +73,10 @@ export class Wire {
       ...(option !== undefined && { option }),
       createdAt,
     };
+  }
+
+  static launch(l: Launch): LaunchWire {
+    const { id, dir, prompt, createdAt } = l.toState();
+    return { id, dir, prompt, createdAt };
   }
 }
