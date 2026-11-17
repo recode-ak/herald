@@ -1,0 +1,6 @@
+Задача: Бот — диалог /new, /cancel, подсказки команд.
+- src/app/new-window.ts: NewWindowBot — start (машины на связи, корни их сессий; сбрасывает chatTarget), input (текст шага; задача → Launch l_… + deleteDialog + waiter h:… + «⏳ Открываю окно на …»), press (n:<метка>:h|d:<i>, n:<метка>:x; перерисовка сообщения следующим шагом), cancel, drop, active (забытый диалог удаляется).
+- src/app/human.ts: /new, /cancel; другая команда и выбор в /sessions прерывают диалог; текст без reply при живом диалоге — в диалог раньше chatTarget.
+- src/app/messages.ts: шаги и кнопки диалога, dirLabel (~), NO_HOSTS, подсказки с /new, /cancel, /exit.
+- src/domain/session.ts: геттер root.
+- тесты: new-window.test.ts (19), правка текстов в human.test.ts, session.test.ts.
