@@ -26,3 +26,8 @@
 
 - [x] **Track: Новое окно агента: herald spawn в tmux-сессии agents, закрытие — herald self /exit**
 *Link: [./tracks/spawn_20261117/](./tracks/spawn_20261117/)*
+
+---
+
+- [ ] **Track: Окна агентов без активного агента: демон машины herald host, команды бота /new и /exit**
+*Link: [./tracks/host_20261117/](./tracks/host_20261117/)*
