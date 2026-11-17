@@ -16,7 +16,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: `bun run check` зелёный; требования 3, 4, 7 покрыты тестами; `docs/model.md` — сервер.
 
-- [ ] Task: Сценарии демона — `HostService`: опрос с ожиданием, итог запуска → reply человеку
+- [~] Task: Сценарии демона — `HostService`: опрос с ожиданием, итог запуска → reply человеку
 - [ ] Task: HTTP — `/v1/host/poll`, `/v1/host/done`
 - [ ] Task: Бот — диалог `/new` (машина → каталог → задача), `/cancel`, подсказки команд
 - [ ] Task: Документы — `docs/model.md` (сервер: машина, запуск, API, бот, хранение)
@@ -40,3 +40,15 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [ ] Task: Служба `herald-host` на машине по `docs/install.md`
 - [ ] Task: Живая проверка — `/new` в `~/herald-livetest`, задача, `/sessions`, `/exit`
 - [ ] Task: Conductor - User Manual Verification 'Фаза 4: Выкатка и живая проверка' (Protocol in workflow.md)
+
+## Заметки к реализации (тактика, решено по ходу)
+
+- Маршруты `/v1/host/*` — в том же `HttpApi`: машина = `caller.session.host` (клиент и так шлёт `session` в каждом теле), человек — по токену. Отдельный разбор тела не нужен.
+- `HostService` (`src/app/host.ts`): `poll(caller, waitMs)` — `Host.seen`/`touch` + `saveHost`, невыданные `pendingLaunches` → `take` → сохранить → вернуть; пусто — ждать темы waiter `h:<person>:<host>` до `waitMs`. `done(caller, id, outcome)` — чужой запуск/машина — `ForbiddenError`; `finish` → сохранить → reply человеку на `chatId/messageId` запуска: «🪟 Окно открыто на <машина>: …» / «⚠️ Окно не открылось на <машина>: …».
+- Бот (`HumanService` → отдельный класс диалога в `src/app/new-window.ts`, чтобы не раздувать `human.ts`): `/new` — машины на связи (`hostsOf` + `isOnline`), каталоги машины — корни (`root`) сессий человека на этой машине, свежие первыми, без повторов (у `Session` нужен геттер `root`). `/new` сбрасывает `chatTarget`; выбор в `/sessions` удаляет диалог. Текст при живом (не `isExpired`) диалоге идёт в диалог раньше `chatTarget`; reply на сообщение сессии — как раньше (не диалог). Ошибка домена в диалоге — «⚠️ …», диалог остаётся. Задача → `Launch.create` (id `l_…`) + `deleteDialog` + `waiter.notify('h:…')` + «⏳ Открываю окно на <машина>…».
+- `callback_data`: `n:<token>:h:<i>`, `n:<token>:d:<i>`, `n:<token>:x` (отмена); `token` — `NewWindowDialog.token`; не тот токен или нет диалога — «⚠️ кнопка устарела».
+- Подсказки: `Messages.UNKNOWN_COMMAND` и «Выбери адресата… (/clear, /compact)» — с `/exit`; список команд — с `/new`, `/cancel` (тесты `human.test.ts` ~396, 416, 512 правятся под новый текст).
+- pi: `/exit` не трогаем — расширение уже отвечает «⚠️ /exit не выполнена: pi не знает этой команды».
+- Демон (`herald host`): `AgentLauncher` с `cwd = home`, сессия tmux `agents`, таймаут 60 с; итог ok — `pane`, `window`, `dir`; ошибка — `LaunchError.message` (там хвост экрана).
+- Отчёт `purge` теперь с `hosts`, `launches`, `dialogs` — отразить в `docs/model.md`, «Хранение».
+- Цикл задачи удобно делать скриптом (если не стёрт): `/tmp/claude-1000/-home-nur-dev-tools-herald/6db7a092-b82b-4e88-bbc6-23f0c75a0d17/scratchpad/done.sh "<коммит>" "<note>" "<уникальный фрагмент задачи>" "<фрагмент следующей>"` — коммит, git note, отметка в плане, коммит плана.
