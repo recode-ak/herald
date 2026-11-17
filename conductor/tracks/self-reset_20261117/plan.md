@@ -2,7 +2,7 @@
 
 Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.md).
 
-## Фаза 1: Код
+## Фаза 1: Код [checkpoint: 3389e98]
 
 Критерии фазы: `bun run check` зелёный; требования 1–9 покрыты тестами.
 
@@ -10,7 +10,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Сигналы хуков — `HookSignals` и `herald hook` (b5baa7a)
 - [x] Task: Самосброс — `SelfReset` (хуки, `--delay`, срок, notify) (fa2438d)
 - [x] Task: CLI — `herald self`, запуск фоном (508d22d)
-- [ ] Task: Conductor - User Manual Verification 'Фаза 1: Код' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 1: Код' (3389e98) (Protocol in workflow.md)
 
 ## Фаза 2: Документы и настройка
 
