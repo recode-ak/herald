@@ -59,3 +59,92 @@ describe('herald hook', () => {
     expect(result.stderr).toContain('herald hook');
   });
 });
+
+describe('herald self', () => {
+  let state: string;
+  beforeEach(() => {
+    state = mkdtempSync(join(tmpdir(), 'herald-state-'));
+  });
+  afterEach(() => rmSync(state, { recursive: true, force: true }));
+
+  const run = async (args: string[], env: Record<string, string> = { TMUX_PANE: '%20' }) => {
+    let stdout = '';
+    let stderr = '';
+    const detached: { argv: string[]; log: string }[] = [];
+    const typed: { pane: string; text: string }[] = [];
+    const code = await new Cli({
+      env: { XDG_STATE_HOME: state, HERALD_CONFIG: join(state, 'нет.json'), ...env },
+      cwd: state,
+      clock: new SystemClock(),
+      out: (s) => {
+        stdout += s;
+      },
+      err: (s) => {
+        stderr += s;
+      },
+      detach: async (argv, log) => void detached.push({ argv, log }),
+      terminal: (pane) => ({ send: async (text) => void typed.push({ pane, text }) }),
+    }).run(['self', ...args]);
+    return { code, stdout, stderr, detached, typed };
+  };
+
+  test('запускает себя фоном с теми же параметрами и сразу отвечает: панель и лог', async () => {
+    const result = await run(['/compact', 'оставь', 'план', '--message', 'Продолжай трек', '--timeout', '30']);
+    expect(result.code).toBe(0);
+    const log = join(state, 'herald', 'self', '20.log');
+    expect(JSON.parse(result.stdout)).toEqual({ ok: true, pane: '%20', log });
+    expect(result.detached).toEqual([
+      {
+        argv: ['self', '--foreground', '--timeout', '30', '--message', 'Продолжай трек', '--', '/compact оставь план'],
+        log,
+      },
+    ]);
+    expect(result.typed).toEqual([]);
+  });
+
+  test('--delay передаётся фоновому процессу; срок по умолчанию — 600 с', async () => {
+    const result = await run(['/new', '--delay', '3']);
+    expect(result.detached[0]?.argv).toEqual([
+      'self',
+      '--foreground',
+      '--timeout',
+      '600',
+      '--delay',
+      '3',
+      '--',
+      '/new',
+    ]);
+  });
+
+  test('--foreground: выполняет сам — набирает в свою панель', async () => {
+    const result = await run(['--foreground', '--delay', '0', '--message', 'Дальше', '--', '/clear']);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({ ok: true });
+    expect(result.typed).toEqual([
+      { pane: '%20', text: '/clear' },
+      { pane: '%20', text: 'Дальше' },
+    ]);
+  });
+
+  test('--foreground: не дождался хука — код 1 и причина', async () => {
+    const result = await run(['--foreground', '--timeout', '0', '/clear']);
+    expect(result.code).toBe(1);
+    expect(JSON.parse(result.stdout)).toEqual({ ok: false, reason: expect.stringContaining('Stop') });
+    expect(result.typed).toEqual([]);
+  });
+
+  test('вне tmux — ошибка сразу, фоном не запускается', async () => {
+    const result = await run(['/clear'], {});
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('tmux');
+    expect(result.detached).toEqual([]);
+  });
+
+  test('команда — обязательна и с «/», в одну строку', async () => {
+    for (const args of [[], ['clear'], ['/clear\nещё']]) {
+      const result = await run(args);
+      expect(result.code).toBe(1);
+      expect(result.detached).toEqual([]);
+    }
+  });
+});

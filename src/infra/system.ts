@@ -1,3 +1,5 @@
+import { closeSync, mkdirSync, openSync } from 'node:fs';
+import { dirname } from 'node:path';
 import type { Clock, Ids } from '../app/ports.ts';
 
 /** Системные часы. */
@@ -33,5 +35,23 @@ export class RandomIds implements Ids {
       }
     }
     return `${prefix}_${id}`;
+  }
+}
+
+/**
+ * Процесс фоном отдельной сессией (`setsid -f`): переживает родителя, его группу процессов и терминал
+ * (Bash агента после команды завершает своё). Вывод дописывается в `log`.
+ */
+export class DetachedProcess {
+  static async spawn(command: readonly string[], log: string): Promise<void> {
+    mkdirSync(dirname(log), { recursive: true });
+    const fd = openSync(log, 'a');
+    try {
+      // setsid -f выходит сразу после fork: ждём только его.
+      const code = await Bun.spawn(['setsid', '-f', ...command], { stdin: 'ignore', stdout: fd, stderr: fd }).exited;
+      if (code !== 0) throw new Error(`setsid: код ${code}`);
+    } finally {
+      closeSync(fd);
+    }
   }
 }

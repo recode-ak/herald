@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,5 +31,29 @@ describe('herald как программа', () => {
     });
     expect(run.exitCode).toBe(1);
     expect(run.stderr.toString()).toContain('serverUrl');
+  });
+
+  test('herald self уходит фоном и сразу отвечает; итог фонового процесса — в логе', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'herald-home-'));
+    dirs.push(home);
+    const run = Bun.spawnSync(
+      ['bun', join(repo, 'src', 'cli', 'main.ts'), 'self', '/clear', '--delay', '0', '--message', 'Дальше'],
+      { cwd: home, env: { PATH: process.env.PATH ?? '', HOME: home, TMUX_PANE: '%999999' }, stdout: 'pipe' },
+    );
+    expect(run.exitCode).toBe(0);
+    const { log } = JSON.parse(run.stdout.toString()) as { log: string };
+    const read = () => {
+      try {
+        return readFileSync(log, 'utf8');
+      } catch {
+        return '';
+      }
+    };
+    for (let i = 0; i < 100 && !read().includes('"ok"'); i++) await Bun.sleep(50);
+    // Панели нет: tmux не набрал — итог с причиной.
+    expect(JSON.parse(read().trim().split('\n').at(-1) ?? '')).toEqual({
+      ok: false,
+      reason: expect.stringContaining('tmux'),
+    });
   });
 });

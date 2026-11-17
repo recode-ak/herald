@@ -10,6 +10,8 @@ import { ClientConfig, ClientConfigError } from '../client/config.ts';
 import { SessionLocator } from '../client/locator.ts';
 import type { Choice, QuestionOption, Resolution } from '../domain/question.ts';
 import type { QuestionWire } from '../http/wire.ts';
+import type { Terminal } from '../terminal/terminal.ts';
+import { TmuxTerminal } from '../terminal/tmux.ts';
 import { Args, type ArgsSpec, UsageError } from './args.ts';
 import { TerminalCommands } from './terminal.ts';
 
@@ -21,6 +23,10 @@ export interface CliDeps {
   err: (text: string) => void;
   /** Весь stdin процесса (`herald hook`); нет — пусто. */
   stdin?: () => Promise<string>;
+  /** Запустить `herald <argv>` фоном отдельной сессией (`herald self`); нет — ошибка. */
+  detach?: (argv: string[], log: string) => Promise<void>;
+  /** Терминал панели tmux (`herald self`); по умолчанию — `TmuxTerminal`. */
+  terminal?: (pane: string) => Terminal;
 }
 
 /** Ответ на пункт в выводе CLI. */
@@ -70,6 +76,13 @@ const USAGE = `herald — вопросы и уведомления челове�
   herald inbox [--wait <с>] [--ack]             входящие: ответы, поздние ответы, указания,
                                                 переводы в терминал
   herald ack <id>…                              подтвердить прочтение входящих
+  herald self <команда> [--message <текст>] [--timeout <с>] [--delay <с>] [--foreground]
+                                                самосброс: в своё окно tmux набрать команду
+                                                (/clear, /compact…), затем сообщение для
+                                                продолжения; моменты — по хукам Stop и SessionStart
+                                                (срок каждого — --timeout, по умолчанию 600 с),
+                                                без хуков — --delay: сообщение через N с.
+                                                Идёт фоном, сразу отвечает; не вышло — notify
   herald hook                                   хук Claude Code (Stop, SessionStart): JSON хука
                                                 из stdin → метка окна tmux; всегда код 0
 
@@ -113,6 +126,10 @@ export class Cli {
           return await this.ack(rest);
         case 'hook':
           return await this.terminal().hook();
+        case 'self': {
+          const args = this.parse(rest, { values: ['message', 'timeout', 'delay'], switches: ['foreground'] });
+          return await this.terminal(args).self(args);
+        }
         default:
           throw new UsageError(command ? `неизвестная команда «${command}»` : 'нужна команда');
       }
@@ -214,12 +231,21 @@ export class Cli {
     return this.print({ read: await this.client(args).ack(args.positional) });
   }
 
-  private terminal(): TerminalCommands {
+  /** Команды окна tmux; `args` — для сессии уведомлений (`--session`). */
+  private terminal(args?: Args): TerminalCommands {
     return new TerminalCommands({
       env: this.deps.env,
-      now: () => this.deps.clock.now(),
+      clock: this.deps.clock,
+      out: this.deps.out,
       err: this.deps.err,
       stdin: this.deps.stdin ?? (async () => ''),
+      detach:
+        this.deps.detach ??
+        (async () => {
+          throw new Error('запуск фоном недоступен');
+        }),
+      terminal: this.deps.terminal ?? ((pane) => new TmuxTerminal(pane)),
+      notify: (text) => this.client(args ?? this.parse([], {})).notify(text),
     });
   }
 
