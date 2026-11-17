@@ -2,7 +2,7 @@
 
 Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.md).
 
-## Фаза 1: Домен и хранилище
+## Фаза 1: Домен и хранилище [checkpoint: fd2e5ed]
 
 Критерии фазы: `bun run check` зелёный; требования 1, 2, 4 (правила диалога), 5, 6 покрыты тестами.
 
@@ -10,7 +10,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Домен — диалог `/new` `NewWindowDialog` (`src/domain/new-window.ts`): шаги, выбор по кнопке, ввод, отмена (11e7fd1)
 - [x] Task: Домен — команда `/exit` (44d77d1)
 - [x] Task: Хранилище — таблицы машин, запусков и диалогов (миграция v7), порт `Store`, очистка (2cfef6b)
-- [~] Task: Conductor - User Manual Verification 'Фаза 1: Домен и хранилище' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 1: Домен и хранилище' (fd2e5ed) (Protocol in workflow.md)
 
 ## Фаза 2: Сценарии сервера и API
 
