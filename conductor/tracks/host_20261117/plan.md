@@ -6,7 +6,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: `bun run check` зелёный; требования 1, 2, 4 (правила диалога), 5, 6 покрыты тестами.
 
-- [ ] Task: Домен — машина `Host` и запуск `Launch` (`src/domain/host.ts`)
+- [~] Task: Домен — машина `Host` и запуск `Launch` (`src/domain/host.ts`)
 - [ ] Task: Домен — диалог `/new` `NewWindowDialog` (`src/domain/new-window.ts`): шаги, выбор по кнопке, ввод, отмена
 - [ ] Task: Домен — команда `/exit`
 - [ ] Task: Хранилище — таблицы машин, запусков и диалогов (миграция v7), порт `Store`, очистка
