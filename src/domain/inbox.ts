@@ -3,7 +3,7 @@ import { DomainError } from './errors.ts';
 
 /**
  * `answer` — ответ на вопрос, `late-answer` — ответ на уже решённый вопрос, `directive` — указание человека,
- * `command` — команда терминала агента (`/clear`, `/compact`): её выполняет не агент, а его окружение (канал, расширение),
+ * `command` — команда терминала агента (`/clear`, `/compact`, `/exit`): её выполняет не агент, а его окружение (канал, расширение),
  * `to-terminal` — человек перевёл вопрос в терминал: агент задаёт его у себя,
  * `hold` — человек нажал «Жди меня»: агенту решать нельзя, ждать ответа без срока.
  */
@@ -29,7 +29,7 @@ export class InboxItem {
   private constructor(private readonly state: InboxItemState) {}
 
   /** Команды терминала, которые человек может отдать сессии. */
-  static readonly COMMANDS: readonly string[] = ['/clear', '/compact'];
+  static readonly COMMANDS: readonly string[] = ['/clear', '/compact', '/exit'];
 
   static isCommand(text: string): boolean {
     return InboxItem.COMMANDS.includes(text);

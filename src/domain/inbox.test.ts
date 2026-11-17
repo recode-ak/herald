@@ -29,11 +29,12 @@ describe('InboxItem', () => {
     expect(InboxItem.kinds(['hold'])).toEqual(['hold']);
   });
 
-  test('команда терминала — только из списка: /clear, /compact', () => {
+  test('команда терминала — только из списка: /clear, /compact, /exit', () => {
     const item = InboxItem.create({ ...base, id: 'i1', kind: 'command', text: '/compact' }, t0);
     expect(item.kind).toBe('command');
-    expect(InboxItem.COMMANDS).toEqual(['/clear', '/compact']);
+    expect(InboxItem.COMMANDS).toEqual(['/clear', '/compact', '/exit']);
     expect(InboxItem.isCommand('/clear')).toBe(true);
+    expect(InboxItem.isCommand('/exit')).toBe(true);
     expect(InboxItem.isCommand('/rm')).toBe(false);
     expect(() => InboxItem.create({ ...base, id: 'i2', kind: 'command', text: '/rm -rf' }, t0)).toThrow(DomainError);
   });
