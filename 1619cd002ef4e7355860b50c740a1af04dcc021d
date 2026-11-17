@@ -1,0 +1,1 @@
+Задача: CLI. herald spawn <каталог> [--prompt] [--tmux agents] [--timeout 60] → AgentLauncher; вывод { ok, pane, window, dir }; LaunchError — stderr и код 1. CliDeps: tmux, claude (путь из PATH).
