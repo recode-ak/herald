@@ -6,9 +6,9 @@ import { ClientConfig } from '../client/config.ts';
 import { SessionLocator } from '../client/locator.ts';
 import { Session } from '../domain/session.ts';
 import { SystemClock } from '../infra/system.ts';
+import { TmuxTerminal } from '../terminal/tmux.ts';
 import { HeraldChannel } from './channel.ts';
 import { ClaudeLaunch } from './launch.ts';
-import { TmuxTerminal } from './tmux.ts';
 
 const log = (message: string) => process.stderr.write(`${message}\n`);
 

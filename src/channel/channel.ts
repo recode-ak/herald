@@ -5,6 +5,7 @@ import type { AskItem, AskRequest, ItemAnswerRequest } from '../client/client.ts
 import type { InboxKind } from '../domain/inbox.ts';
 import type { Choice, QuestionOption } from '../domain/question.ts';
 import type { InboxItemWire, QuestionWire } from '../http/wire.ts';
+import type { Terminal } from '../terminal/terminal.ts';
 
 /** Что каналу нужно от клиента herald (реализация — `HeraldClient`, в тестах — `FakeHerald`). */
 export interface ChannelHerald {
@@ -20,14 +21,9 @@ export interface ChannelHerald {
   ack(ids: readonly string[]): Promise<string[]>;
 }
 
-/** Терминал окна агента: команды `/clear`, `/compact` набираются в нём (реализация — `TmuxTerminal`). */
-export interface Terminal {
-  send(command: string): Promise<void>;
-}
-
 export interface HeraldChannelOptions {
   herald: ChannelHerald;
-  /** Нет — окно не в tmux: команды не выполняются, человеку уходит уведомление. */
+  /** Команды `/clear`, `/compact` набираются в окне агента. Нет — окно не в tmux: команды не выполняются, человеку уходит уведомление. */
   terminal?: Terminal;
   log?: (message: string) => void;
   /** Long poll входящих за один запрос клиента. */

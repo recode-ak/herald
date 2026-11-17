@@ -3,7 +3,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { JSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
 import type { AskItem } from '../client/client.ts';
-import { HeraldChannel, type Terminal } from './channel.ts';
+import type { Terminal } from '../terminal/terminal.ts';
+import { HeraldChannel } from './channel.ts';
 import { FakeHerald } from './herald.fake.ts';
 
 const cleanup: (() => unknown)[] = [];

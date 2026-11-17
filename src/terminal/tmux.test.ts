@@ -18,6 +18,22 @@ describe('TmuxTerminal', () => {
     ]);
   });
 
+  test('многострочный текст — вставкой из буфера (bracketed paste), затем Enter: перевод строки не отправляет раньше', async () => {
+    const calls: string[][] = [];
+    const terminal = new TmuxTerminal('%20', async (args) => void calls.push(args));
+    await terminal.send('Продолжай трек.\nФаза 2, задача 1.');
+    expect(calls).toEqual([
+      ['send-keys', '-t', '%20', 'C-u'],
+      ['set-buffer', '-b', 'herald-%20', '--', 'Продолжай трек.\nФаза 2, задача 1.'],
+      ['paste-buffer', '-p', '-d', '-b', 'herald-%20', '-t', '%20'],
+      ['send-keys', '-t', '%20', 'Enter'],
+    ]);
+  });
+
+  test('панель — из конструктора', () => {
+    expect(new TmuxTerminal('%7').pane).toBe('%7');
+  });
+
   test('tmux завершился с ошибкой — исключение с его stderr', async () => {
     const terminal = new TmuxTerminal('%999', TmuxTerminal.run);
     await expect(terminal.send('/clear')).rejects.toThrow(/tmux/);

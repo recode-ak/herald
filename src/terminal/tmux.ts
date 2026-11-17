@@ -1,17 +1,18 @@
-import type { Terminal } from './channel.ts';
+import type { Terminal } from './terminal.ts';
 
 type Env = Record<string, string | undefined>;
 /** Запуск `tmux` с аргументами; ненулевой код — исключение. */
 type TmuxRun = (args: string[]) => Promise<void>;
 
 /**
- * Терминал окна агента в tmux: команда набирается в панель так, будто её ввёл человек.
- * Поле ввода сначала очищается (Ctrl+U; набранное возвращает Ctrl+Y), иначе команда приклеится к черновику.
+ * Терминал окна агента в tmux: текст набирается в панель так, будто его ввёл человек.
+ * Поле ввода сначала очищается (Ctrl+U; набранное возвращает Ctrl+Y), иначе текст приклеится к черновику.
+ * Многострочный — вставкой (bracketed paste): перевод строки, набранный клавишей, отправил бы сообщение по частям.
  * Если агент занят, Claude Code ставит команду в очередь и выполняет после хода.
  */
 export class TmuxTerminal implements Terminal {
   constructor(
-    private readonly pane: string,
+    readonly pane: string,
     private readonly tmux: TmuxRun = TmuxTerminal.run,
   ) {}
 
@@ -21,9 +22,16 @@ export class TmuxTerminal implements Terminal {
     return pane ? new TmuxTerminal(pane) : undefined;
   }
 
-  async send(command: string): Promise<void> {
+  async send(text: string): Promise<void> {
     await this.tmux(['send-keys', '-t', this.pane, 'C-u']);
-    await this.tmux(['send-keys', '-t', this.pane, '-l', command]);
+    if (text.includes('\n')) {
+      // Буфер — свой у панели; -d удаляет его после вставки.
+      const buffer = `herald-${this.pane}`;
+      await this.tmux(['set-buffer', '-b', buffer, '--', text]);
+      await this.tmux(['paste-buffer', '-p', '-d', '-b', buffer, '-t', this.pane]);
+    } else {
+      await this.tmux(['send-keys', '-t', this.pane, '-l', text]);
+    }
     await this.tmux(['send-keys', '-t', this.pane, 'Enter']);
   }
 
