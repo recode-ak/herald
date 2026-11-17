@@ -9,8 +9,8 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Домен — машина `Host` и запуск `Launch` (`src/domain/host.ts`) (19060ac)
 - [x] Task: Домен — диалог `/new` `NewWindowDialog` (`src/domain/new-window.ts`): шаги, выбор по кнопке, ввод, отмена (11e7fd1)
 - [x] Task: Домен — команда `/exit` (44d77d1)
-- [~] Task: Хранилище — таблицы машин, запусков и диалогов (миграция v7), порт `Store`, очистка
-- [ ] Task: Conductor - User Manual Verification 'Фаза 1: Домен и хранилище' (Protocol in workflow.md)
+- [x] Task: Хранилище — таблицы машин, запусков и диалогов (миграция v7), порт `Store`, очистка (2cfef6b)
+- [~] Task: Conductor - User Manual Verification 'Фаза 1: Домен и хранилище' (Protocol in workflow.md)
 
 ## Фаза 2: Сценарии сервера и API
 
