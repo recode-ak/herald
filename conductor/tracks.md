@@ -21,3 +21,8 @@
 
 - [x] **Track: Самосброс агента: herald self — команда в своё окно tmux и сообщение для продолжения**
 *Link: [./tracks/self-reset_20261117/](./tracks/self-reset_20261117/)*
+
+---
+
+- [~] **Track: Новое окно агента: herald spawn в tmux-сессии agents, закрытие — herald self /exit**
+*Link: [./tracks/spawn_20261117/](./tracks/spawn_20261117/)*

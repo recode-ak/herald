@@ -1,0 +1,8 @@
+{
+  "track_id": "spawn_20261117",
+  "type": "feature",
+  "status": "in_progress",
+  "created_at": "2026-11-17T15:30:00Z",
+  "updated_at": "2026-11-17T15:30:00Z",
+  "description": "Новое окно агента: herald spawn запускает Claude Code с каналом в tmux-сессии agents; закрытие — herald self /exit"
+}
