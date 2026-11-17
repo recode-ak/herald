@@ -1,0 +1,5 @@
+Задача: Сценарии демона — HostService.
+- src/app/host.ts: poll(caller, waitMs) — отмечает машину (Host.seen/touch), выдаёт невыданные запуски один раз (take), иначе ждёт темы h:<человек>:<машина> до waitMs; done(caller, id, outcome) — чужой запуск/машина → ForbiddenError, нет → NotFoundError, finish → сохранить → reply «🪟 Окно открыто на …» / «⚠️ Окно не открылось на …». Итог сохраняется до отправки: сбой Telegram не продублирует окно.
+- src/app/waiter.ts: Waiter.hostTopic.
+- src/app/messages.ts: Messages.launchOutcome.
+- src/app/host.test.ts: 16 тестов.
