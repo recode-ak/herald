@@ -10,6 +10,7 @@ describe('Session', () => {
     const s = Session.open({ person: 'nur', host: 'laptop', root: '/home/nur/dev/kalki/u7-school' }, t0);
     expect(s.key).toBe('laptop:/home/nur/dev/kalki/u7-school');
     expect(s.project).toBe('u7-school');
+    expect(s.root).toBe('/home/nur/dev/kalki/u7-school');
     expect(s.person).toBe('nur');
     expect(s.lastSeenAt).toBe(t0);
     expect(s.status).toBeUndefined();

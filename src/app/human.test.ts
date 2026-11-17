@@ -393,7 +393,7 @@ describe('/sessions и /status', () => {
         'laptop · 1 мин назад',
         'Фаза 2: сценарии',
         '',
-        'Выбери адресата указания или команды (/clear, /compact).',
+        'Выбери адресата указания или команды (/clear, /compact, /exit).',
       ].join('\n'),
     );
     expect(menu.buttons!.map((row) => row.map((b) => b.text))).toEqual([['herald · laptop'], ['u7-school · laptop']]);
@@ -413,7 +413,7 @@ describe('/sessions и /status', () => {
         '<i>laptop · только что</i>',
         'ревью <code>df2caad</code>',
         '',
-        '<i>Выбери адресата указания или команды (/clear, /compact).</i>',
+        '<i>Выбери адресата указания или команды (/clear, /compact, /exit).</i>',
       ].join('\n'),
     );
   });
@@ -509,7 +509,9 @@ describe('Команды терминала', () => {
     await k.press(NUR_CHAT, menu.messageId, menu.buttons![0]![0]!.data);
 
     await k.say(NUR_CHAT, '/model opus');
-    expect(k.telegram.last(NUR_CHAT)?.text).toBe('Неизвестная команда. Есть: /sessions, /status, /clear, /compact.');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe(
+      'Неизвестная команда. Есть: /new, /sessions, /status, /cancel, /clear, /compact, /exit.',
+    );
     await k.say(NUR_CHAT, 'стоп');
     expect((await k.agent.inbox(nur)).map((i) => [i.kind, i.text])).toEqual([['directive', 'стоп']]);
   });

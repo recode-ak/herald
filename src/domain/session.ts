@@ -69,6 +69,10 @@ export class Session {
   get project(): string {
     return this.state.project;
   }
+  /** Корень проекта на машине (каталог, где запущен агент). */
+  get root(): string {
+    return this.state.root;
+  }
   get lastSeenAt(): number {
     return this.state.lastSeenAt;
   }

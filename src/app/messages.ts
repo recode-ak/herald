@@ -1,4 +1,5 @@
 import type { Launch } from '../domain/host.ts';
+import type { NewWindowDialog } from '../domain/new-window.ts';
 import type { Question, QuestionItem, Resolution } from '../domain/question.ts';
 import type { Session } from '../domain/session.ts';
 import { Markup } from './markup.ts';
@@ -222,7 +223,7 @@ export class Messages {
     return [
       style.bold('Сессии на связи:'),
       ...sessions.map(block),
-      style.italic('Выбери адресата указания или команды (/clear, /compact).'),
+      style.italic('Выбери адресата указания или команды (/clear, /compact, /exit).'),
     ].join('\n\n');
   }
 
@@ -277,8 +278,45 @@ export class Messages {
       : `⚠️ Окно не открылось на ${launch.host}: ${outcome.text}`;
   }
 
+  static readonly NO_HOSTS = 'Нет машин на связи: запусти herald host.';
+  static readonly NEW_WINDOW_CANCELLED = '✖ Новое окно отменено.';
+  static readonly NOTHING_TO_CANCEL = 'Отменять нечего.';
+  static readonly STALE_BUTTON = '⚠️ кнопка устарела';
+
+  /** Сообщение шага диалога `/new`. */
+  static newWindowStep(dialog: NewWindowDialog): string {
+    if (dialog.step === 'host') return '🪟 Новое окно. На какой машине?';
+    if (dialog.step === 'dir') {
+      return dialog.choices.length > 0
+        ? `🪟 Новое окно на ${dialog.host}. Каталог? Выбери или пришли путь от ~.`
+        : `🪟 Новое окно на ${dialog.host}. Пришли каталог — путь от ~.`;
+    }
+    const dir = Messages.dirLabel(dialog.dir ?? '');
+    return `🪟 Новое окно: ${dialog.host} · ${dir}. Задача? Следующее сообщение уйдёт агенту первым.`;
+  }
+
+  /** Кнопки шага: варианты (`n:<метка>:h|d:<номер>`) и «Отмена» (`n:<метка>:x`). */
+  static newWindowButtons(dialog: NewWindowDialog): Keyboard {
+    const kind = dialog.step === 'host' ? 'h' : 'd';
+    const label = dialog.step === 'host' ? (c: string) => c : Messages.dirLabel;
+    return [
+      ...dialog.choices.map((c, i) => [{ text: label(c), data: `n:${dialog.token}:${kind}:${i}` }]),
+      [{ text: '✖ Отмена', data: `n:${dialog.token}:x` }],
+    ];
+  }
+
+  /** Каталог для человека: домашний — `~` (по виду пути: сервер не знает `$HOME` машины). */
+  static dirLabel(dir: string): string {
+    return dir.replace(/^\/(?:home|Users)\/[^/]+(?=\/|$)/, '~');
+  }
+
+  static launching(host: string): string {
+    return `⏳ Открываю окно на ${host}…`;
+  }
+
   static readonly NO_SESSIONS = 'Сессий на связи нет.';
-  static readonly UNKNOWN_COMMAND = 'Неизвестная команда. Есть: /sessions, /status, /clear, /compact.';
+  static readonly UNKNOWN_COMMAND =
+    'Неизвестная команда. Есть: /new, /sessions, /status, /cancel, /clear, /compact, /exit.';
   static readonly WHOM = 'Кому? Ответь reply на сообщение сессии или выбери адресата в /sessions.';
   /** Кнопка вопроса, которого больше нет: удалён очисткой по сроку хранения. */
   static readonly QUESTION_GONE = '⚠️ вопрос устарел и удалён';

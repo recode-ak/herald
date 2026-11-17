@@ -4,6 +4,7 @@ import { InboxItem, type InboxKind } from '../domain/inbox.ts';
 import type { Choice, Question, Resolution } from '../domain/question.ts';
 import type { Session } from '../domain/session.ts';
 import { Messages } from './messages.ts';
+import { NewWindowBot } from './new-window.ts';
 import { Notices } from './notices.ts';
 import { type Clock, ForbiddenError, type Ids, NotFoundError } from './ports.ts';
 import type { Store } from './store.ts';
@@ -26,14 +27,16 @@ type CallbackUpdate = Extract<TelegramUpdate, { kind: 'callback' }>;
 
 /**
  * Сценарии человека — разбор апдейтов Telegram: кнопки вопросов, reply, `/sessions`, `/status`,
- * команды терминала сессии (`/clear`, `/compact`).
+ * команды терминала сессии (`/clear`, `/compact`, `/exit`), диалог нового окна (`/new`, `/cancel`).
  * Принимаются только апдейты chat_id из доступа и только по сессиям своего человека.
  */
 export class HumanService {
   private readonly notices: Notices;
+  private readonly newWindow: NewWindowBot;
 
   constructor(private readonly deps: HumanDeps) {
     this.notices = new Notices(deps.store, deps.telegram, deps.timeZone);
+    this.newWindow = new NewWindowBot(deps);
   }
 
   async handle(update: TelegramUpdate): Promise<void> {
@@ -71,13 +74,18 @@ export class HumanService {
     if (kind === 'h' && id && rest.length === 0) return this.hold(person, id);
     if (kind === 't' && id && rest.length === 0) return this.toTerminal(person, id);
     if (kind === 's' && id && rest.length === 0) return this.select(person, update.chatId, id);
-    return '⚠️ кнопка устарела';
+    if (kind === 'n') return this.newWindow.press([id ?? '', ...rest], update);
+    return Messages.STALE_BUTTON;
   }
 
   /** Сообщение человека; возвращает ответ бота (или ничего). */
   private async onMessage(person: PersonId, update: MessageUpdate): Promise<string | undefined> {
     const text = update.text.trim();
     const command = text.startsWith('/') ? text.split(/\s/, 1)[0]?.split('@', 1)[0] : undefined;
+    if (command === '/new') return this.newWindow.start(person, update.chatId);
+    if (command === '/cancel') return this.newWindow.cancel(update.chatId);
+    // Другая команда прерывает диалог `/new` и выполняется как обычно.
+    if (command) this.newWindow.drop(update.chatId);
     if (command === '/sessions') return this.sessionsMenu(person, update.chatId);
     if (command === '/status') return this.statusReport(person, update);
     if (command && !InboxItem.isCommand(command)) return Messages.UNKNOWN_COMMAND;
@@ -92,6 +100,9 @@ export class HumanService {
       }
       return this.post(person, link.sessionKey, 'directive', text, update);
     }
+
+    const dialog = command ? undefined : this.newWindow.active(update.chatId);
+    if (dialog) return this.newWindow.input(dialog, update.text, update);
 
     const target = this.deps.store.chatTarget(update.chatId);
     if (!target) return Messages.WHOM;
@@ -233,6 +244,7 @@ export class HumanService {
   private async select(person: PersonId, chatId: number, token: string): Promise<string> {
     const session = this.deps.store.sessionsOf(person).find((s) => HumanService.sessionToken(s) === token);
     if (!session) throw new ForbiddenError('сессия недоступна');
+    this.newWindow.drop(chatId);
     this.deps.store.setChatTarget(chatId, session.key);
     await this.deps.telegram.send({ chatId, text: `✍️ Следующее сообщение — указание сессии ${session.project}.` });
     return `Адресат: ${session.project}`;
