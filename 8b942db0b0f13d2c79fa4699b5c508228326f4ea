@@ -1,0 +1,1 @@
+Выкатка: push 1119143 (ответ q_5xvd6kxuf0: A). scripts/deploy.sh: bun install без изменений, pm2 restart, /health ok. БД: user_version 7, таблицы hosts, launches, dialogs; error-лог пуст.
