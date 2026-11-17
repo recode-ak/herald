@@ -6,6 +6,7 @@ import { FakeTelegram } from '../app/telegram.fake.ts';
 import { NUR_CHAT, SeqIds } from '../app/testkit.fake.ts';
 import { Waiter } from '../app/waiter.ts';
 import { Access } from '../domain/access.ts';
+import { Launch } from '../domain/host.ts';
 import { HttpApi } from '../http/api.ts';
 import { SqliteStore } from '../infra/sqlite-store.ts';
 import { SystemClock } from '../infra/system.ts';
@@ -73,7 +74,16 @@ function setup(maxWaitMs = 40) {
       text,
       replyTo: telegram.last(NUR_CHAT)!.messageId,
     });
-  return { telegram, calls, client, press, reply };
+  const launch = (id: string) => {
+    deps.store.saveLaunch(
+      Launch.create(
+        { id, person: 'nur', host: 'laptop', dir: 'dev/x', prompt: 'задача', chatId: NUR_CHAT, messageId: 7 },
+        clock.now(),
+      ),
+    );
+    deps.waiter.notify(Waiter.hostTopic('nur', 'laptop'));
+  };
+  return { telegram, calls, client, press, reply, launch };
 }
 
 const k0 = (serverUrl: string) =>
@@ -222,5 +232,41 @@ describe('HeraldClient', () => {
     const started = performance.now();
     await expect(down.inbox(100)).rejects.toBeInstanceOf(HeraldClientError);
     expect(performance.now() - started).toBeGreaterThanOrEqual(90);
+  });
+
+  test('hostPoll: ожидание с переподключением до первого запуска; выдача один раз', async () => {
+    const k = setup();
+    const c = k.client();
+    expect(await c.hostPoll(0)).toEqual([]);
+    const waiting = c.hostPoll(5_000);
+    await Bun.sleep(120);
+    k.launch('l_1');
+    const launches = await waiting;
+    expect(launches).toEqual([{ id: 'l_1', dir: 'dev/x', prompt: 'задача', createdAt: expect.any(Number) }]);
+    expect(k.calls.filter((p) => p === '/v1/host/poll').length).toBeGreaterThan(2);
+    expect(await c.hostPoll(60)).toEqual([]);
+  });
+
+  test('hostPoll без срока ждёт сколько нужно', async () => {
+    const k = setup();
+    const waiting = k.client().hostPoll();
+    await Bun.sleep(150);
+    k.launch('l_1');
+    expect((await waiting).map((l) => l.id)).toEqual(['l_1']);
+  });
+
+  test('hostDone: итог reply человеку; повтор — HeraldClientError 400', async () => {
+    const k = setup();
+    const c = k.client();
+    k.launch('l_1');
+    await c.hostPoll(0);
+    await c.hostDone('l_1', { ok: false, text: 'нет каталога' });
+    expect(k.telegram.last(NUR_CHAT)).toMatchObject({
+      text: '⚠️ Окно не открылось на laptop: нет каталога',
+      replyTo: 7,
+    });
+    const error = await c.hostDone('l_1', { ok: true, text: 'x' }).catch((e) => e);
+    expect(error).toBeInstanceOf(HeraldClientError);
+    expect(error.status).toBe(400);
   });
 });

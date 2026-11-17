@@ -2,7 +2,7 @@ import type { Clock } from '../app/ports.ts';
 import type { InboxKind } from '../domain/inbox.ts';
 import type { Choice, QuestionOption } from '../domain/question.ts';
 import type { SessionRef } from '../domain/session.ts';
-import type { InboxItemWire, QuestionWire } from '../http/wire.ts';
+import type { InboxItemWire, LaunchWire, QuestionWire } from '../http/wire.ts';
 
 /** Ошибка обращения к серверу: `status` — HTTP-код ответа, без него — сервер недоступен. */
 export class HeraldClientError extends Error {
@@ -41,6 +41,12 @@ export type AskRequest = (AskItem | { questions: AskItem[] }) & {
   /** Сколько агент ждёт, прежде чем решить сам; без него решать будет нельзя. */
   timeoutMs?: number;
 };
+
+/** Итог запуска окна для `/v1/host/done`: `text` — окно (`ok`) или причина сбоя. */
+export interface LaunchOutcome {
+  ok: boolean;
+  text: string;
+}
 
 /**
  * HTTP-клиент herald — общий для CLI и канала. Long poll: ожидание переподключается до своего таймаута,
@@ -116,6 +122,23 @@ export class HeraldClient {
         ((await this.call('/v1/inbox', { waitMs: chunk, ...filter })) as { items: InboxItemWire[] }).items,
       (items) => items.length > 0,
     );
+  }
+
+  /**
+   * Демон машины (`herald host`): невыданные запуски машины сессии; если их нет — ждать первых до `waitMs`
+   * (без него — бесконечно, сбои сети и 5xx пережидаются). Выданный запуск сервер больше не отдаёт.
+   */
+  async hostPoll(waitMs?: number): Promise<LaunchWire[]> {
+    return this.poll(
+      waitMs,
+      async (chunk) => ((await this.call('/v1/host/poll', { waitMs: chunk })) as { launches: LaunchWire[] }).launches,
+      (launches) => launches.length > 0,
+    );
+  }
+
+  /** Итог запуска — один раз; человеку уходит reply на его сообщение с задачей. */
+  async hostDone(id: string, outcome: LaunchOutcome): Promise<void> {
+    await this.call('/v1/host/done', { id, ok: outcome.ok, text: outcome.text });
   }
 
   private static question(body: unknown): QuestionWire {
