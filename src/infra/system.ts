@@ -43,7 +43,7 @@ export class RandomIds implements Ids {
  * (Bash агента после команды завершает своё). Вывод дописывается в `log`.
  */
 export class DetachedProcess {
-  static async spawn(command: readonly string[], log: string): Promise<void> {
+  async spawn(command: readonly string[], log: string): Promise<void> {
     mkdirSync(dirname(log), { recursive: true });
     const fd = openSync(log, 'a');
     try {

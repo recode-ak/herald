@@ -43,7 +43,7 @@ describe('DetachedProcess', () => {
     try {
       const log = join(dir, 'self', '20.log');
       const start = Date.now();
-      await DetachedProcess.spawn(['sh', '-c', 'sleep 0.3; echo готово'], log);
+      await new DetachedProcess().spawn(['sh', '-c', 'sleep 0.3; echo готово'], log);
       expect(Date.now() - start).toBeLessThan(250);
       for (let i = 0; i < 40 && !readFileSync(log, 'utf8').includes('готово'); i++) await Bun.sleep(50);
       expect(readFileSync(log, 'utf8')).toContain('готово');
