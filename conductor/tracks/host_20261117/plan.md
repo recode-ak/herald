@@ -28,8 +28,8 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 - [x] Task: Клиент — `hostPoll`, `hostDone` (dab8e9d)
 - [x] Task: CLI — демон `herald host` (734a9b5)
-- [~] Task: Канал — `/exit` без статуса после команды
-- [ ] Task: Документы — `docs/model.md` (CLI, канал), `docs/install.md` (unit `systemd --user`, linger)
+- [x] Task: Канал — `/exit` без статуса после команды (5110c9a)
+- [~] Task: Документы — `docs/model.md` (CLI, канал), `docs/install.md` (unit `systemd --user`, linger)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 3: Демон и канал' (Protocol in workflow.md)
 
 ## Фаза 4: Выкатка и живая проверка
