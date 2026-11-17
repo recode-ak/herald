@@ -1,8 +1,8 @@
 {
   "track_id": "self-reset_20261117",
   "type": "feature",
-  "status": "in_progress",
+  "status": "completed",
   "created_at": "2026-11-17T00:00:00Z",
-  "updated_at": "2026-11-17T00:00:00Z",
+  "updated_at": "2026-11-17T15:20:00Z",
   "description": "Самосброс агента: herald self набирает команду (/clear, /compact…) в своё окно tmux и продолжает работу сообщением"
 }

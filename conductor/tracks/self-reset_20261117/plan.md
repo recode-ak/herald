@@ -12,11 +12,11 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: CLI — `herald self`, запуск фоном (508d22d)
 - [x] Task: Conductor - User Manual Verification 'Фаза 1: Код' (3389e98) (Protocol in workflow.md)
 
-## Фаза 2: Документы и настройка
+## Фаза 2: Документы и настройка [checkpoint: 309b89f]
 
 Критерии фазы: документы обновлены; хуки настроены; проверка в отдельном окне Claude Code в tmux пройдена.
 
 - [x] Task: Документы — `docs/model.md`, `docs/install.md` (bc135a7)
 - [x] Task: Хуки в `~/.claude/settings.json`, ручная проверка в отдельном окне (2026-11-17: /clear, /compact, многострочное — работают)
 - [x] Task: Автопилот — п. 5 глобального `AGENTS.md` (~/.pi/agent/AGENTS.md, вне git herald)
-- [ ] Task: Conductor - User Manual Verification 'Фаза 2: Документы и настройка' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 2: Документы и настройка' (309b89f) (Protocol in workflow.md)
