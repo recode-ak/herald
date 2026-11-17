@@ -18,5 +18,5 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 - [x] Task: Документы — `docs/model.md`, `docs/install.md` (bc135a7)
 - [x] Task: Хуки в `~/.claude/settings.json`, ручная проверка в отдельном окне (2026-11-17: /clear, /compact, многострочное — работают)
-- [ ] Task: Автопилот — п. 5 глобального `AGENTS.md`
+- [x] Task: Автопилот — п. 5 глобального `AGENTS.md` (~/.pi/agent/AGENTS.md, вне git herald)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 2: Документы и настройка' (Protocol in workflow.md)
