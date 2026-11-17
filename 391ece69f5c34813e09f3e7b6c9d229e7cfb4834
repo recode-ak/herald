@@ -1,0 +1,6 @@
+Задача: HTTP — /v1/host/poll, /v1/host/done.
+- src/http/api.ts: маршруты в том же HttpApi; зависимость host: HostService; машина — session.host вызывающего; poll ограничен maxWaitMs.
+- src/http/body.ts: RequestBody.boolean.
+- src/http/wire.ts: LaunchWire, Wire.launch (id, dir, prompt, createdAt).
+- src/server/herald-server.ts: сборка HostService.
+- тесты: api.test.ts (опрос, ожидание, итог, 400/403/404), body.test.ts, wire.test.ts; client/cli тесты — новая зависимость.
