@@ -1,0 +1,1 @@
+Задача: Сигналы хуков. HookSignals (src/terminal/signals.ts) — метки {event, source, at} по панели в $XDG_STATE_HOME/herald/hooks; herald hook (src/cli/terminal.ts, TerminalCommands) читает JSON хука из stdin, всегда код 0 и пустой stdout. CliDeps.stdin.
