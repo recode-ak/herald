@@ -1,0 +1,6 @@
+Задача: Документы — docs/model.md (сервер).
+- Новые разделы «Машина и запуск», «Диалог /new».
+- Бот: /new, задача, /cancel, /exit, подсказки, прерывание диалога, callback_data n:…
+- Ожидание: тема h:<человек>:<машина>, HostService.poll.
+- HTTP API: /v1/host/poll, /v1/host/done, launch в wire, 403 для чужого запуска.
+- Хранение: машины, запуски, диалоги; счётчики purge hosts/launches/dialogs.
