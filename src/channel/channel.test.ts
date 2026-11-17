@@ -341,6 +341,20 @@ describe('HeraldChannel — команды терминала', () => {
     expect(herald.statuses).toEqual(['🧹 /clear — контекст сброшен, жду указаний', '🗜 /compact — контекст сжат']);
   });
 
+  test('/exit набирается в окне, статус после неё не ставится — окно закрывается', async () => {
+    const sent: string[] = [];
+    const { herald, channel, until } = await setup({ terminal: { send: async (c) => void sent.push(c) } });
+    channel.start();
+    herald.push(
+      { id: 'i_1', kind: 'command', text: '/exit', createdAt: 1 },
+      { id: 'i_2', kind: 'command', text: '/clear', createdAt: 2 },
+    );
+    await until(() => herald.acked.length === 2);
+    expect(sent).toEqual(['/exit', '/clear']);
+    expect(herald.statuses).toEqual(['🧹 /clear — контекст сброшен, жду указаний']);
+    expect(herald.notified).toEqual([]);
+  });
+
   test('сбой статуса после команды — команда не повторяется, прочтение подтверждается', async () => {
     const sent: string[] = [];
     const { herald, channel, until } = await setup({ terminal: { send: async (c) => void sent.push(c) } });

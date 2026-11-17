@@ -195,4 +195,12 @@ describe('HeraldExtension — входящие', () => {
     await until(() => herald.notified.length === 1);
     expect(herald.notified).toEqual(['⚠️ /model не выполнена: pi не знает этой команды']);
   });
+
+  test('/exit pi не знает — человеку уведомление, сессия не закрывается', async () => {
+    const { pi, herald, until } = setup();
+    await pi.emit('session_start', { reason: 'startup' });
+    herald.push({ id: 'i1', kind: 'command', text: '/exit', createdAt: 0 });
+    await until(() => herald.notified.length === 1);
+    expect(herald.notified).toEqual(['⚠️ /exit не выполнена: pi не знает этой команды']);
+  });
 });

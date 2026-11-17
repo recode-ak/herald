@@ -23,7 +23,7 @@ export interface ChannelHerald {
 
 export interface HeraldChannelOptions {
   herald: ChannelHerald;
-  /** Команды `/clear`, `/compact` набираются в окне агента. Нет — окно не в tmux: команды не выполняются, человеку уходит уведомление. */
+  /** Команды `/clear`, `/compact`, `/exit` набираются в окне агента. Нет — окно не в tmux: команды не выполняются, человеку уходит уведомление. */
   terminal?: Terminal;
   log?: (message: string) => void;
   /** Long poll входящих за один запрос клиента. */
@@ -388,7 +388,7 @@ export class HeraldChannel {
       await this.herald.status(status).catch((e) => this.log(`herald channel: статус: ${HeraldChannel.message(e)}`));
   }
 
-  /** Статус сессии после команды терминала. */
+  /** Статус сессии после команды терминала; после `/exit` — нет: окно закрывается. */
   private static readonly AFTER_COMMAND: Readonly<Record<string, string>> = {
     '/clear': '🧹 /clear — контекст сброшен, жду указаний',
     '/compact': '🗜 /compact — контекст сжат',
