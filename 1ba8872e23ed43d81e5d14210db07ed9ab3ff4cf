@@ -1,0 +1,15 @@
+Контрольная точка Фазы 3 «Демон и канал» трека host (Автопилот: ручная проверка считается пройденной).
+
+Автотесты: CI=true bun run check — biome, tsc, 551 pass / 0 fail.
+Файлы фазы с тестами: src/client/client.ts (client.test.ts), src/cli/host.ts и Cli host (host.test.ts — юнит HostDaemon + CLI→HTTP→окно→Telegram), src/cli/main.ts (main.test.ts — SIGTERM → 0), src/channel/channel.ts (channel.test.ts — /exit без статуса), pi (extension.test.ts — /exit → уведомление).
+
+Локальная проверка демона против локального сервера (скрипт в scratchpad check-host.ts): сервер src/server/main.ts с фейковым Bot API (HERALD_TELEGRAM_API), herald host с HERALD_HOST=checkbox, tmux на отдельном сокете, фейковый claude.
+- /new → «🪟 Новое окно на checkbox. Пришли каталог — путь от ~.» (одна машина — шаг машины пропущен)
+- ~/herald-livetest → «…Задача?»; задача → «⏳ Открываю окно на checkbox…»
+- итог → «🪟 Окно открыто на checkbox: /home/nur/herald-livetest (окно @0, панель %0)», reply на сообщение с задачей
+- tmux: agents:herald-livetest в /home/nur/herald-livetest; команда claude --dangerously-load-development-channels server:herald -- <задача>
+- нет каталога → «⚠️ Окно не открылось на checkbox: нет каталога /home/nur/нет-такого»
+- SIGTERM → код 0; журнал демона в stderr.
+~/herald-livetest и tmux-сервер проверки удалены.
+
+План ручной проверки для Ф4 (вживую): служба herald-host по docs/install.md, /new из Telegram → окно в ~/herald-livetest, задача доходит, сессия в /sessions, /exit закрывает окно.
