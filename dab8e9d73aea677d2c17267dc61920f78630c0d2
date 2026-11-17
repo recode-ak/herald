@@ -1,0 +1,1 @@
+Задача «Клиент — hostPoll, hostDone» (Ф3 трека host). HeraldClient.hostPoll(waitMs?) — long poll /v1/host/poll с переподключением; без срока ждёт бесконечно, сбои сети и 5xx пережидаются. hostDone(id, {ok,text}) — /v1/host/done. Тип LaunchOutcome. Файлы: src/client/client.ts, src/client/client.test.ts.
