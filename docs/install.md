@@ -126,6 +126,38 @@ claude() {
 
 Новые окна агентов (`herald spawn`) открываются в tmux-сессии `agents` — `tmux attach -t agents`. Нужен tmux ≥ 3.0 (команда окна — без shell) и `claude` в `PATH`.
 
+## Демон машины: окна по `/new`
+
+`herald host` (`docs/model.md` «Демон машины») открывает окна агентов по `/new` из бота, когда активных агентов нет. Нужны CLI с настройками (выше), tmux ≥ 3.0 и `claude` в `PATH`. Ставится службой `systemd --user` — unit пишется из оболочки, чтобы `PATH` был тот же, что в ней (`herald` — скрипт Bun, окнам нужен `claude`):
+
+```sh
+mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/herald-host.service <<EOF
+[Unit]
+Description=herald host — окна агентов по /new из Telegram
+
+[Service]
+ExecStart=%h/.local/bin/herald host
+WorkingDirectory=%h
+Environment="PATH=$PATH"
+Restart=on-failure
+RestartSec=10
+# tmux-сервер, запущенный демоном, — в cgroup службы: иначе её стоп или перезапуск закроет окна агентов.
+KillMode=process
+
+[Install]
+WantedBy=default.target
+EOF
+systemctl --user daemon-reload
+systemctl --user enable --now herald-host
+journalctl --user -u herald-host -f        # журнал: «herald host: машина <host>…; жду запусков»
+```
+
+- Окна — в tmux-сессии `agents` того же tmux-сервера, что у оболочки (сокет по умолчанию): `tmux attach -t agents`. Сервера нет — его поднимает первое окно (`new-session`).
+- `PATH` сменился (новый bun, claude) — пересоздать unit той же командой, затем `systemctl --user daemon-reload && systemctl --user restart herald-host`.
+- Неверный токен — код 1, `Restart=on-failure` перезапускает раз в 10 с; причина — в журнале.
+- **Linger не включается:** служба живёт, пока ты вошёл в систему (есть хоть одна сессия); после выхода `systemd --user` останавливается вместе с демоном. Работа без входа — `loginctl enable-linger` — вне рамок.
+
 ## Расширение для pi
 
 Пакет `integrations/pi`: на время сессии pi сообщения из Telegram (указания, поздние ответы) приходят в сессию сами, `/clear` и `/compact` из Telegram выполняются, сессия видна в `/sessions`, пока pi открыт. Настройки — те же, что у CLI; CLI в bash этой сессии pi пишет в тот же ящик (`PI_SESSION_ID`). Подробности — `docs/model.md` «Расширение pi».
