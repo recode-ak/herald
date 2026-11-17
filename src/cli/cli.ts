@@ -10,9 +10,11 @@ import { ClientConfig, ClientConfigError } from '../client/config.ts';
 import { SessionLocator } from '../client/locator.ts';
 import type { Choice, QuestionOption, Resolution } from '../domain/question.ts';
 import type { QuestionWire } from '../http/wire.ts';
+import { AgentLauncher } from '../terminal/launcher.ts';
 import type { Terminal } from '../terminal/terminal.ts';
 import { type TmuxRun, TmuxTerminal } from '../terminal/tmux.ts';
 import { Args, type ArgsSpec, UsageError } from './args.ts';
+import { HostDaemon } from './host.ts';
 import { TerminalCommands } from './terminal.ts';
 
 export interface CliDeps {
@@ -31,6 +33,8 @@ export interface CliDeps {
   tmux?: TmuxRun;
   /** Полный путь к `claude` (`herald spawn`); по умолчанию — из `PATH`. */
   claude?: () => string | undefined;
+  /** Сигнал остановки демона (`herald host`): SIGTERM, SIGINT; нет — работает до ошибки. */
+  stop?: () => AbortSignal;
 }
 
 /** Ответ на пункт в выводе CLI. */
@@ -92,6 +96,10 @@ const USAGE = `herald — вопросы и уведомления челове�
                                                 в tmux-сессии agents (каталог — внутри домашнего),
                                                 задача — первым сообщением; закрыть окно —
                                                 herald self /exit из него
+  herald host [--tmux <сессия>] [--timeout <с>]
+                                                демон машины: окна агентов по /new из Telegram
+                                                (каталог — от домашнего, сессия agents, срок окна —
+                                                60 с); журнал — stderr, SIGTERM/SIGINT — выход 0
   herald hook                                   хук Claude Code (Stop, SessionStart): JSON хука
                                                 из stdin → метка окна tmux; всегда код 0
 
@@ -139,6 +147,8 @@ export class Cli {
           const args = this.parse(rest, { values: ['prompt', 'tmux', 'timeout'] });
           return await this.terminal(args).spawn(args);
         }
+        case 'host':
+          return await this.host(rest);
         case 'self': {
           const args = this.parse(rest, { values: ['message', 'timeout', 'delay'], switches: ['foreground'] });
           return await this.terminal(args).self(args);
@@ -242,6 +252,37 @@ export class Cli {
     const args = this.parse(argv, {});
     if (args.positional.length === 0) throw new UsageError('ack: нужен хотя бы один id');
     return this.print({ read: await this.client(args).ack(args.positional) });
+  }
+
+  /** Демон машины: машина — `host` из настроек, запуски — в каталогах от домашнего. */
+  private async host(argv: readonly string[]): Promise<number> {
+    const args = this.parse(argv, { values: ['tmux', 'timeout'] });
+    if (args.positional.length > 0) throw new UsageError('host: лишние аргументы');
+    const timeoutMs = args.seconds('timeout') ?? TerminalCommands.SPAWN_TIMEOUT_S * 1_000;
+    const { env, clock, err } = this.deps;
+    const config = ClientConfig.load(env);
+    const claude = (this.deps.claude ?? (() => Bun.which('claude') ?? undefined))();
+    const home = env.HOME;
+    if (!claude || !home) {
+      err(`herald host: ${claude ? 'нет HOME' : 'claude не найден в PATH'}\n`);
+      return 1;
+    }
+    const link = new HeraldClient({
+      serverUrl: config.serverUrl,
+      token: config.token,
+      session: { host: config.host, root: home },
+      clock,
+    });
+    const launcher = new AgentLauncher({ tmux: this.deps.tmux ?? TmuxTerminal.run, home, cwd: home, claude, clock });
+    return new HostDaemon({
+      link,
+      launcher,
+      clock,
+      log: (line) => err(`${line}\n`),
+      name: config.host,
+      tmuxSession: args.value('tmux') ?? TerminalCommands.SPAWN_SESSION,
+      timeoutMs,
+    }).run(this.deps.stop?.() ?? new AbortController().signal);
   }
 
   /** Команды окна tmux; `args` — для сессии уведомлений (`--session`). */

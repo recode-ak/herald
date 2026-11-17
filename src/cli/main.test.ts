@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -55,5 +55,35 @@ describe('herald как программа', () => {
       ok: false,
       reason: expect.stringContaining('tmux'),
     });
+  });
+
+  test('herald host: сервер недоступен — ждёт; SIGTERM — код 0', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'herald-home-'));
+    dirs.push(home);
+    const bin = join(home, 'bin');
+    mkdirSync(bin);
+    writeFileSync(join(bin, 'claude'), '#!/bin/sh\n');
+    chmodSync(join(bin, 'claude'), 0o755);
+    const proc = Bun.spawn(['bun', join(repo, 'src', 'cli', 'main.ts'), 'host'], {
+      cwd: home,
+      env: {
+        PATH: `${bin}:${process.env.PATH ?? ''}`,
+        HOME: home,
+        HERALD_URL: 'http://127.0.0.1:1',
+        HERALD_TOKEN: 't',
+        HERALD_HOST: 'laptop',
+      },
+      stderr: 'pipe',
+    });
+    const reader = proc.stderr.getReader();
+    let log = '';
+    while (!log.includes('жду запусков')) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      log += new TextDecoder().decode(value);
+    }
+    expect(log).toContain('herald host: машина laptop');
+    proc.kill('SIGTERM');
+    expect(await proc.exited).toBe(0);
   });
 });
