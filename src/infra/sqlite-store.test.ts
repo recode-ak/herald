@@ -3,7 +3,9 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Host, Launch } from '../domain/host.ts';
 import { InboxItem } from '../domain/inbox.ts';
+import { NewWindowDialog } from '../domain/new-window.ts';
 import { Question } from '../domain/question.ts';
 import { Session } from '../domain/session.ts';
 import { SqliteStore } from './sqlite-store.ts';
@@ -265,6 +267,9 @@ describe('SqliteStore: время связи (v5)', () => {
   });
 });
 
+/** Счётчики машин, запусков и диалогов (v7), когда их нет. */
+const NO_HOSTS = { hosts: 0, launches: 0, dialogs: 0 };
+
 describe('SqliteStore: очистка', () => {
   const DAY = 86_400_000;
   const now = Date.now();
@@ -319,8 +324,8 @@ describe('SqliteStore: очистка', () => {
     const store = seed();
     const report = store.purge(cutoff);
 
-    expect(report.deleted).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1 });
-    expect(report.remaining).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1 });
+    expect(report.deleted).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1, ...NO_HOSTS });
+    expect(report.remaining).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1, ...NO_HOSTS });
     expect(report.dbBytes).toBeGreaterThan(0);
 
     expect(store.session(deadKey)).toBeUndefined();
@@ -356,7 +361,7 @@ describe('SqliteStore: очистка', () => {
     store.saveLink({ chatId: 111, messageId: 901, sessionKey: liveKey });
 
     const report = store.purge(Date.now() + 1000);
-    expect(report.deleted).toEqual({ sessions: 0, questions: 0, inbox: 0, links: 1, targets: 0 });
+    expect(report.deleted).toEqual({ sessions: 0, questions: 0, inbox: 0, links: 1, targets: 0, ...NO_HOSTS });
     expect(store.link(111, 901)).toBeUndefined();
     expect(store.link(111, 4)).toBeDefined();
     expect(store.link(111, 504)).toBeDefined();
@@ -365,12 +370,19 @@ describe('SqliteStore: очистка', () => {
   test('dryRun — те же счётчики (и «останется»), ничего не удалено; повторная очистка — нули', () => {
     const store = seed();
     const dry = store.purge(cutoff, { dryRun: true });
-    expect(dry.deleted).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1 });
-    expect(dry.remaining).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1 });
+    expect(dry.deleted).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1, ...NO_HOSTS });
+    expect(dry.remaining).toEqual({ sessions: 1, questions: 2, inbox: 2, links: 5, targets: 1, ...NO_HOSTS });
     expect(store.session(deadKey)).toBeDefined();
 
     store.purge(cutoff);
-    expect(store.purge(cutoff).deleted).toEqual({ sessions: 0, questions: 0, inbox: 0, links: 0, targets: 0 });
+    expect(store.purge(cutoff).deleted).toEqual({
+      sessions: 0,
+      questions: 0,
+      inbox: 0,
+      links: 0,
+      targets: 0,
+      ...NO_HOSTS,
+    });
   });
 });
 
@@ -422,5 +434,76 @@ describe('SqliteStore: файл', () => {
     const reopened = SqliteStore.open(path);
     expect(reopened.session(Session.keyOf(ref))?.project).toBe('u7-school');
     reopened.close();
+  });
+});
+
+describe('SqliteStore: машины, запуски, диалоги (v7)', () => {
+  const launchDraft = { person: 'nur', host: 'laptop', dir: 'dev/u7', prompt: 'сделай', chatId: 111, messageId: 5 };
+
+  test('машина: сохранение по человеку и имени, список человека — свежие первыми', () => {
+    const store = SqliteStore.open(':memory:');
+    expect(store.host('nur', 'laptop')).toBeUndefined();
+    const laptop = Host.seen({ person: 'nur', name: 'laptop' }, 100);
+    store.saveHost(laptop);
+    store.saveHost(Host.seen({ person: 'nur', name: 'pc' }, 200));
+    store.saveHost(Host.seen({ person: 'ann', name: 'laptop' }, 300));
+    laptop.touch(150);
+    store.saveHost(laptop);
+    expect(store.host('nur', 'laptop')?.toState()).toEqual({ person: 'nur', name: 'laptop', lastSeenAt: 150 });
+    expect(store.hostsOf('nur').map((h) => h.name)).toEqual(['pc', 'laptop']);
+  });
+
+  test('запуск: состояние целиком; невыданные машины — по времени создания', () => {
+    const store = SqliteStore.open(':memory:');
+    const a = Launch.create({ ...launchDraft, id: 'l_a' }, 200);
+    const b = Launch.create({ ...launchDraft, id: 'l_b' }, 100);
+    const other = Launch.create({ ...launchDraft, id: 'l_c', host: 'pc' }, 50);
+    for (const l of [a, b, other]) store.saveLaunch(l);
+    expect(store.pendingLaunches('nur', 'laptop').map((l) => l.id)).toEqual(['l_b', 'l_a']);
+    expect(store.pendingLaunches('ann', 'laptop')).toEqual([]);
+    b.take(300);
+    b.finish({ ok: false, text: 'нет каталога' }, 400);
+    store.saveLaunch(b);
+    expect(store.launch('l_b')?.toState()).toEqual(b.toState());
+    expect(store.launch('l_a')?.toState()).toEqual(a.toState());
+    expect(store.launch('l_x')).toBeUndefined();
+    expect(store.pendingLaunches('nur', 'laptop').map((l) => l.id)).toEqual(['l_a']);
+  });
+
+  test('диалог /new — один на чат: сохранение заменяет, удаление', () => {
+    const store = SqliteStore.open(':memory:');
+    const hosts = [
+      { name: 'laptop', dirs: ['/a'] },
+      { name: 'pc', dirs: [] },
+    ];
+    const d = NewWindowDialog.start({ chatId: 111, person: 'nur', hosts }, 100);
+    store.saveDialog(d);
+    d.choose('host', 0);
+    store.saveDialog(d);
+    expect(store.dialog(111)?.toState()).toEqual(d.toState());
+    expect(store.dialog(222)).toBeUndefined();
+    store.deleteDialog(111);
+    expect(store.dialog(111)).toBeUndefined();
+  });
+
+  test('очистка: машины — по опросу, запуски — по созданию, диалоги — по началу', () => {
+    const store = SqliteStore.open(':memory:');
+    const DAY = 86_400_000;
+    const now = Date.now();
+    const cutoff = now - 14 * DAY;
+    const old = now - 20 * DAY;
+    store.saveHost(Host.seen({ person: 'nur', name: 'old' }, old));
+    store.saveHost(Host.seen({ person: 'nur', name: 'fresh' }, now));
+    store.saveLaunch(Launch.create({ ...launchDraft, id: 'l_old' }, old));
+    store.saveLaunch(Launch.create({ ...launchDraft, id: 'l_new' }, now));
+    store.saveDialog(NewWindowDialog.start({ chatId: 1, person: 'nur', hosts: [{ name: 'h', dirs: [] }] }, old));
+    store.saveDialog(NewWindowDialog.start({ chatId: 2, person: 'nur', hosts: [{ name: 'h', dirs: [] }] }, now));
+    const report = store.purge(cutoff);
+    expect(report.deleted).toMatchObject({ hosts: 1, launches: 1, dialogs: 1 });
+    expect(report.remaining).toMatchObject({ hosts: 1, launches: 1, dialogs: 1 });
+    expect(store.hostsOf('nur').map((h) => h.name)).toEqual(['fresh']);
+    expect(store.launch('l_old')).toBeUndefined();
+    expect(store.dialog(1)).toBeUndefined();
+    expect(store.dialog(2)).toBeDefined();
   });
 });

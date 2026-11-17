@@ -1,7 +1,9 @@
 import { Database } from 'bun:sqlite';
 import type { MessageLink, PurgeCounts, PurgeReport, Store } from '../app/store.ts';
 import type { PersonId } from '../domain/access.ts';
+import { Host, Launch } from '../domain/host.ts';
 import { Inbox, InboxItem, type InboxKind } from '../domain/inbox.ts';
+import { NewWindowDialog } from '../domain/new-window.ts';
 import { Question, type QuestionItem, type QuestionStatus } from '../domain/question.ts';
 import { Session } from '../domain/session.ts';
 
@@ -9,7 +11,8 @@ import { Session } from '../domain/session.ts';
  * Схема: v1 — таблицы, v2 — название сессии, v3 — закрытие окна, v4 — срок вопроса,
  * v5 — время связи с сообщением (для очистки; ставит SQLite при сохранении; ALTER не умеет DEFAULT-выражение —
  * таблица пересоздаётся), v6 — пачка вопросов: пункты JSON-ом (`items`; плоские поля — первый пункт, для чтения
- * старых строк), перевод в терминал, пункт в связи с сообщением. Версия — `PRAGMA user_version`; следующая — новый элемент массива.
+ * старых строк), перевод в терминал, пункт в связи с сообщением; v7 — машины, запуски окон, диалоги `/new`
+ * (состояние диалога — JSON). Версия — `PRAGMA user_version`; следующая — новый элемент массива.
  */
 const MIGRATIONS = [
   `
@@ -103,6 +106,33 @@ const MIGRATIONS = [
   ALTER TABLE message_links ADD COLUMN item INTEGER;
   CREATE INDEX questions_open ON questions (session_key, status, asked_at);
   `,
+  `
+  CREATE TABLE IF NOT EXISTS hosts (
+    person TEXT NOT NULL,
+    name TEXT NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    PRIMARY KEY (person, name)
+  );
+  CREATE TABLE IF NOT EXISTS launches (
+    id TEXT PRIMARY KEY,
+    person TEXT NOT NULL,
+    host TEXT NOT NULL,
+    dir TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    chat_id INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    taken_at INTEGER,
+    finished_at INTEGER,
+    outcome TEXT
+  );
+  CREATE INDEX IF NOT EXISTS launches_pending ON launches (person, host, taken_at, created_at);
+  CREATE TABLE IF NOT EXISTS dialogs (
+    chat_id INTEGER PRIMARY KEY,
+    state TEXT NOT NULL,
+    started_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 /** Сигнал отката транзакции пробной очистки (`dryRun`). */
@@ -148,6 +178,26 @@ interface InboxRow {
   option: string | null;
   created_at: number;
   read_at: number | null;
+}
+
+interface HostRow {
+  person: string;
+  name: string;
+  last_seen_at: number;
+}
+
+interface LaunchRow {
+  id: string;
+  person: string;
+  host: string;
+  dir: string;
+  prompt: string;
+  chat_id: number;
+  message_id: number;
+  created_at: number;
+  taken_at: number | null;
+  finished_at: number | null;
+  outcome: string | null;
 }
 
 interface LinkRow {
@@ -358,6 +408,79 @@ export class SqliteStore implements Store {
     else this.db.query('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)').run(`target:${chatId}`, sessionKey);
   }
 
+  host(person: PersonId, name: string): Host | undefined {
+    const row = this.db
+      .query<HostRow, [string, string]>('SELECT * FROM hosts WHERE person = ? AND name = ?')
+      .get(person, name);
+    return row ? SqliteStore.toHost(row) : undefined;
+  }
+
+  saveHost(host: Host): void {
+    const h = host.toState();
+    this.db
+      .query('INSERT OR REPLACE INTO hosts (person, name, last_seen_at) VALUES (?, ?, ?)')
+      .run(h.person, h.name, h.lastSeenAt);
+  }
+
+  hostsOf(person: PersonId): Host[] {
+    return this.db
+      .query<HostRow, [string]>('SELECT * FROM hosts WHERE person = ? ORDER BY last_seen_at DESC, name')
+      .all(person)
+      .map(SqliteStore.toHost);
+  }
+
+  launch(id: string): Launch | undefined {
+    const row = this.db.query<LaunchRow, [string]>('SELECT * FROM launches WHERE id = ?').get(id);
+    return row ? SqliteStore.toLaunch(row) : undefined;
+  }
+
+  saveLaunch(launch: Launch): void {
+    const l = launch.toState();
+    this.db
+      .query(
+        `INSERT OR REPLACE INTO launches
+           (id, person, host, dir, prompt, chat_id, message_id, created_at, taken_at, finished_at, outcome)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        l.id,
+        l.person,
+        l.host,
+        l.dir,
+        l.prompt,
+        l.chatId,
+        l.messageId,
+        l.createdAt,
+        l.takenAt ?? null,
+        l.finishedAt ?? null,
+        l.outcome ? JSON.stringify(l.outcome) : null,
+      );
+  }
+
+  pendingLaunches(person: PersonId, host: string): Launch[] {
+    return this.db
+      .query<LaunchRow, [string, string]>(
+        'SELECT * FROM launches WHERE person = ? AND host = ? AND taken_at IS NULL ORDER BY created_at, id',
+      )
+      .all(person, host)
+      .map(SqliteStore.toLaunch);
+  }
+
+  dialog(chatId: number): NewWindowDialog | undefined {
+    const row = this.db.query<{ state: string }, [number]>('SELECT state FROM dialogs WHERE chat_id = ?').get(chatId);
+    return row ? NewWindowDialog.restore(JSON.parse(row.state)) : undefined;
+  }
+
+  saveDialog(dialog: NewWindowDialog): void {
+    this.db
+      .query('INSERT OR REPLACE INTO dialogs (chat_id, state, started_at) VALUES (?, ?, ?)')
+      .run(dialog.chatId, JSON.stringify(dialog.toState()), dialog.startedAt);
+  }
+
+  deleteDialog(chatId: number): void {
+    this.db.query('DELETE FROM dialogs WHERE chat_id = ?').run(chatId);
+  }
+
   purge(cutoff: number, { dryRun = false }: { dryRun?: boolean } = {}): PurgeReport {
     let report: PurgeReport | undefined;
     const run = this.db.transaction(() => {
@@ -404,7 +527,10 @@ export class SqliteStore implements Store {
          OR (question_id IS NULL AND inbox_id IS NULL AND created_at < $cutoff)`,
     );
     const sessions = run('DELETE FROM sessions WHERE last_seen_at < $cutoff');
-    return { sessions, questions, inbox, links, targets };
+    const hosts = run('DELETE FROM hosts WHERE last_seen_at < $cutoff');
+    const launches = run('DELETE FROM launches WHERE created_at < $cutoff');
+    const dialogs = run('DELETE FROM dialogs WHERE started_at < $cutoff');
+    return { sessions, questions, inbox, links, targets, hosts, launches, dialogs };
   }
 
   private counts(): PurgeCounts {
@@ -415,6 +541,9 @@ export class SqliteStore implements Store {
       inbox: count('SELECT count(*) AS n FROM inbox'),
       links: count('SELECT count(*) AS n FROM message_links'),
       targets: count("SELECT count(*) AS n FROM kv WHERE key LIKE 'target:%'"),
+      hosts: count('SELECT count(*) AS n FROM hosts'),
+      launches: count('SELECT count(*) AS n FROM launches'),
+      dialogs: count('SELECT count(*) AS n FROM dialogs'),
     };
   }
 
@@ -435,6 +564,26 @@ export class SqliteStore implements Store {
       ...(r.status_text !== null && r.status_at !== null && { status: { text: r.status_text, at: r.status_at } }),
       ...(r.title !== null && { title: r.title }),
       ...(r.closed_at !== null && { closedAt: r.closed_at }),
+    });
+  }
+
+  private static toHost(r: HostRow): Host {
+    return Host.restore({ person: r.person, name: r.name, lastSeenAt: r.last_seen_at });
+  }
+
+  private static toLaunch(r: LaunchRow): Launch {
+    return Launch.restore({
+      id: r.id,
+      person: r.person,
+      host: r.host,
+      dir: r.dir,
+      prompt: r.prompt,
+      chatId: r.chat_id,
+      messageId: r.message_id,
+      createdAt: r.created_at,
+      ...(r.taken_at !== null && { takenAt: r.taken_at }),
+      ...(r.finished_at !== null && { finishedAt: r.finished_at }),
+      ...(r.outcome !== null && { outcome: JSON.parse(r.outcome) }),
     });
   }
 

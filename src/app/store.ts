@@ -1,5 +1,7 @@
 import type { PersonId } from '../domain/access.ts';
+import type { Host, Launch } from '../domain/host.ts';
 import type { Inbox, InboxItem } from '../domain/inbox.ts';
+import type { NewWindowDialog } from '../domain/new-window.ts';
 import type { Question } from '../domain/question.ts';
 import type { Session } from '../domain/session.ts';
 
@@ -17,13 +19,19 @@ export interface MessageLink {
   inboxId?: string;
 }
 
-/** Сколько записей по видам: сессии, вопросы, входящие, связи с сообщениями, выбранные адресаты чатов. */
+/**
+ * Сколько записей по видам: сессии, вопросы, входящие, связи с сообщениями, выбранные адресаты чатов,
+ * машины, запуски окон, диалоги `/new`.
+ */
 export interface PurgeCounts {
   sessions: number;
   questions: number;
   inbox: number;
   links: number;
   targets: number;
+  hosts: number;
+  launches: number;
+  dialogs: number;
 }
 
 /** Итог очистки: удалено (при `dryRun` — было бы удалено), осталось, размер базы в байтах. */
@@ -59,6 +67,21 @@ export interface Store {
   /** Сессия, выбранная в `/sessions`: следующий текст чата — её указание. */
   chatTarget(chatId: number): string | undefined;
   setChatTarget(chatId: number, sessionKey: string | undefined): void;
+
+  host(person: PersonId, name: string): Host | undefined;
+  saveHost(host: Host): void;
+  /** Машины человека, недавние первыми. */
+  hostsOf(person: PersonId): Host[];
+
+  launch(id: string): Launch | undefined;
+  saveLaunch(launch: Launch): void;
+  /** Невыданные запуски машины — по времени создания. */
+  pendingLaunches(person: PersonId, host: string): Launch[];
+
+  /** Диалог `/new` чата (один на чат). */
+  dialog(chatId: number): NewWindowDialog | undefined;
+  saveDialog(dialog: NewWindowDialog): void;
+  deleteDialog(chatId: number): void;
 
   /**
    * Удалить записи старше границы `cutoff` (мс эпохи) по правилам `docs/model.md`, «Хранение»; одной транзакцией.
