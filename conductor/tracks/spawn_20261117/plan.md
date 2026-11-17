@@ -7,7 +7,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 Критерии фазы: `bun run check` зелёный; требования 1–7 покрыты тестами и документами; живая проверка в tmux пройдена.
 
 - [x] Task: Терминал — `screen()` и `press()` у `TmuxTerminal` (3e5328f)
-- [ ] Task: Запуск — `AgentLauncher` (каталог, сессия agents, диалоги)
+- [x] Task: Запуск — `AgentLauncher` (каталог, сессия agents, диалоги) (792190c)
 - [ ] Task: CLI — `herald spawn`
 - [ ] Task: Канал — инструкции про `herald spawn` и `herald self /exit`; документы
 - [ ] Task: Живая проверка — окно в agents, задача, закрытие
