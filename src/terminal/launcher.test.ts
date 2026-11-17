@@ -16,6 +16,7 @@ class RunningClock implements Clock {
 }
 
 const TRUST = ' Quick safety check\n ❯ No, exit\n   Yes, I trust this folder\n Enter to confirm';
+const TRUST_YES = ' Quick safety check\n   No, exit\n ❯ Yes, I trust this folder\n Enter to confirm';
 const DEV = '  WARNING: Loading development channels\n  ❯ 1. I am using this for local development\n    2. Exit';
 const READY = '▎ Channels (experimental) messages from server:herald inject directly\n❯ задача';
 
@@ -110,11 +111,18 @@ describe('AgentLauncher', () => {
     expect(create?.slice(-3)).toEqual(['/bin/claude', '--dangerously-load-development-channels', 'server:herald']);
   });
 
-  test('диалоги: доверие к папке — Down, Enter; dev-канал — Enter; по разу на диалог', async () => {
-    const tmux = new FakeTmux(true, ['загрузка', TRUST, TRUST, DEV, DEV, READY]);
+  test('диалоги — по состоянию экрана: курсор на «No» — Down, на «Yes» — Enter; dev-канал — Enter', async () => {
+    const tmux = new FakeTmux(true, ['загрузка', TRUST, TRUST_YES, DEV, READY]);
     await launcher(tmux).launch({ dir: '~/dev/u7-hub', tmuxSession: 'agents', timeoutMs: 10_000 });
-    expect(tmux.keys()).toEqual([['Down', 'Enter'], ['Enter']]);
+    expect(tmux.keys()).toEqual([['Down'], ['Enter'], ['Enter']]);
     expect(tmux.calls.filter((c) => c[0] === 'send-keys').every((c) => c[2] === '%42')).toBe(true);
+  });
+
+  test('клавиша потерялась (окно ещё не принимало ввод) — нажимает снова, но не чаще раза в секунду', async () => {
+    // Экран опрашивается раз в 0,5 с: 4 опроса с тем же диалогом — 2 секунды.
+    const tmux = new FakeTmux(true, [TRUST, TRUST, TRUST, TRUST, TRUST_YES, READY]);
+    await launcher(tmux).launch({ dir: '~/dev/u7-hub', tmuxSession: 'agents', timeoutMs: 10_000 });
+    expect(tmux.keys()).toEqual([['Down'], ['Down'], ['Enter']]);
   });
 
   test('не дождался готовности к сроку — ошибка с хвостом экрана', async () => {

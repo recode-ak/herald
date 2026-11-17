@@ -40,6 +40,8 @@ export interface Launched {
  */
 export class AgentLauncher {
   static readonly POLL_MS = 500;
+  /** Та же клавиша на том же экране — не чаще. */
+  static readonly REPEAT_MS = 1_000;
   /** «Доверять ли папке»: по умолчанию выбран «No, exit» — нужен Down. */
   static readonly TRUST_DIALOG = 'Yes, I trust this folder';
   static readonly DEV_CHANNEL_DIALOG = 'I am using this for local development';
@@ -99,6 +101,15 @@ export class AgentLauncher {
     return { pane, window, dir };
   }
 
+  /** Что нажать на этом экране: курсор на «No, exit» — выбрать «Yes» (Down); на «Yes» или dev-канал — Enter. */
+  private static actionFor(screen: string): 'trust-select' | 'trust-confirm' | 'dev-confirm' | undefined {
+    if (screen.includes(AgentLauncher.TRUST_DIALOG)) {
+      const yes = screen.split('\n').find((line) => line.includes(AgentLauncher.TRUST_DIALOG));
+      return yes?.includes('❯') ? 'trust-confirm' : 'trust-select';
+    }
+    return screen.includes(AgentLauncher.DEV_CHANNEL_DIALOG) ? 'dev-confirm' : undefined;
+  }
+
   private async hasSession(name: string): Promise<boolean> {
     try {
       await this.deps.tmux(['has-session', '-t', `=${name}`]);
@@ -108,11 +119,14 @@ export class AgentLauncher {
     }
   }
 
-  /** Пройти «доверять папке» и «dev-канал», дождаться баннера канала. */
+  /**
+   * Пройти «доверять папке» и «dev-канал», дождаться баннера канала. Клавиша — по состоянию экрана
+   * (где курсор), поэтому повтор безопасен: окно на старте может ещё не принимать ввод и потерять нажатие.
+   * Та же клавиша на том же экране — не чаще `REPEAT_MS`; экран сменился — сразу.
+   */
   private async passDialogs(terminal: TmuxTerminal, timeoutMs: number): Promise<void> {
     const deadline = this.deps.clock.now() + timeoutMs;
-    let trusted = false;
-    let developed = false;
+    let last: { action: string; at: number } | undefined;
     let screen = '';
     for (;;) {
       try {
@@ -121,14 +135,13 @@ export class AgentLauncher {
         throw new LaunchError(`окно ${terminal.pane} закрылось до готовности (claude вышел)`);
       }
       if (screen.includes(AgentLauncher.READY)) return;
-      if (!trusted && screen.includes(AgentLauncher.TRUST_DIALOG)) {
-        await terminal.press('Down', 'Enter');
-        trusted = true;
-      } else if (!developed && screen.includes(AgentLauncher.DEV_CHANNEL_DIALOG)) {
-        await terminal.press('Enter');
-        developed = true;
+      const action = AgentLauncher.actionFor(screen);
+      const now = this.deps.clock.now();
+      if (action && !(last?.action === action && now - last.at < AgentLauncher.REPEAT_MS)) {
+        await terminal.press(action === 'trust-select' ? 'Down' : 'Enter');
+        last = { action, at: now };
       }
-      if (this.deps.clock.now() >= deadline) break;
+      if (now >= deadline) break;
       await this.deps.clock.sleep(AgentLauncher.POLL_MS, this.never);
     }
     const tail = screen

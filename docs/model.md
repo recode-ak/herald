@@ -210,7 +210,7 @@ Telegram опрашивается long polling `getUpdates` (25 с); offset хр
 - **Каталог** — `~/…`, абсолютный или относительный (от текущего); после `realpath` — существующий каталог внутри домашнего, иначе ошибка.
 - **Окно** — в tmux-сессии `agents` (`--tmux`): нет её — `new-session -d`, есть — `new-window -d`; имя окна — имя каталога. Смотреть — `tmux attach -t agents`.
 - **Команда** — без shell: `claude --dangerously-load-development-channels server:herald -- <задача>` (флаг забирает значения после себя, поэтому задача — после `--`). `claude` — полный путь из `PATH` вызывающего: окно получает окружение сервера tmux.
-- **Стартовые диалоги** проходятся по экрану (`capture-pane`, раз в 0,5 с): «Yes, I trust this folder» (выбран «No, exit») — Down, Enter; «I am using this for local development» — Enter. Готово — баннер «Channels (experimental)». Не дождался за `--timeout` (60 с) или окно закрылось — ошибка с хвостом экрана. Тексты — Claude Code 2.1.326, при смене правятся константы `AgentLauncher`.
+- **Стартовые диалоги** проходятся по экрану (`capture-pane`, раз в 0,5 с), клавиша — по положению курсора: в «доверять папке» курсор на «No, exit» — Down, на «Yes, I trust this folder» — Enter; «I am using this for local development» — Enter. Окно на старте может потерять нажатие — та же клавиша на том же экране повторяется не чаще раза в секунду. Готово — баннер «Channels (experimental)». Не дождался за `--timeout` (60 с) или окно закрылось — ошибка с хвостом экрана. Тексты — Claude Code 2.1.326, при смене правятся константы `AgentLauncher`.
 - Новая сессия появляется в `/sessions`, когда канал нового окна зарегистрируется.
 
 ## Канал (`src/channel`)
