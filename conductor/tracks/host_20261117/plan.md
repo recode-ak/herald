@@ -22,7 +22,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Документы — `docs/model.md` (сервер: машина, запуск, API, бот, хранение) (2013f77)
 - [x] Task: Conductor - User Manual Verification 'Фаза 2: Сценарии сервера и API' (19f928d) (Protocol in workflow.md)
 
-## Фаза 3: Демон и канал
+## Фаза 3: Демон и канал [checkpoint: 1ba8872]
 
 Критерии фазы: `bun run check` зелёный; требования 8–10 покрыты тестами и документами; локальная проверка демона против локального сервера.
 
@@ -30,7 +30,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: CLI — демон `herald host` (734a9b5)
 - [x] Task: Канал — `/exit` без статуса после команды (5110c9a)
 - [x] Task: Документы — `docs/model.md` (CLI, канал), `docs/install.md` (unit `systemd --user`, linger) (f836b32)
-- [~] Task: Conductor - User Manual Verification 'Фаза 3: Демон и канал' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Фаза 3: Демон и канал' (1ba8872) (Protocol in workflow.md)
 
 ## Фаза 4: Выкатка и живая проверка
 
