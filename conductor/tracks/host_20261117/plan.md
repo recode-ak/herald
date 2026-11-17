@@ -36,8 +36,8 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: сервер выкачен (с подтверждения Нурболата), служба на машине, `/new` и `/exit` работают вживую.
 
-- [ ] Task: Выкатка сервера по `docs/deploy.md` — только после `ask` без таймаута
-- [ ] Task: Служба `herald-host` на машине по `docs/install.md`
+- [x] Task: Выкатка сервера по `docs/deploy.md` — только после `ask` без таймаута (1119143)
+- [~] Task: Служба `herald-host` на машине по `docs/install.md`
 - [ ] Task: Живая проверка — `/new` в `~/herald-livetest`, задача, `/sessions`, `/exit`
 - [ ] Task: Conductor - User Manual Verification 'Фаза 4: Выкатка и живая проверка' (Protocol in workflow.md)
 
