@@ -18,8 +18,8 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 - [x] Task: Сценарии демона — `HostService`: опрос с ожиданием, итог запуска → reply человеку (f730a06)
 - [x] Task: HTTP — `/v1/host/poll`, `/v1/host/done` (391ece6)
-- [~] Task: Бот — диалог `/new` (машина → каталог → задача), `/cancel`, подсказки команд
-- [ ] Task: Документы — `docs/model.md` (сервер: машина, запуск, API, бот, хранение)
+- [x] Task: Бот — диалог `/new` (машина → каталог → задача), `/cancel`, подсказки команд (9316b37)
+- [~] Task: Документы — `docs/model.md` (сервер: машина, запуск, API, бот, хранение)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 2: Сценарии сервера и API' (Protocol in workflow.md)
 
 ## Фаза 3: Демон и канал
