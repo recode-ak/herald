@@ -9,7 +9,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Терминал — многострочный текст вставкой; `TmuxTerminal` в `src/terminal/` (39fa42e)
 - [x] Task: Сигналы хуков — `HookSignals` и `herald hook` (b5baa7a)
 - [x] Task: Самосброс — `SelfReset` (хуки, `--delay`, срок, notify) (fa2438d)
-- [ ] Task: CLI — `herald self`, запуск фоном
+- [x] Task: CLI — `herald self`, запуск фоном (508d22d)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 1: Код' (Protocol in workflow.md)
 
 ## Фаза 2: Документы и настройка
