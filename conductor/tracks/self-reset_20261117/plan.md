@@ -6,7 +6,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: `bun run check` зелёный; требования 1–9 покрыты тестами.
 
-- [ ] Task: Терминал — многострочный текст вставкой; `TmuxTerminal` в `src/terminal/`
+- [x] Task: Терминал — многострочный текст вставкой; `TmuxTerminal` в `src/terminal/` (39fa42e)
 - [ ] Task: Сигналы хуков — `HookSignals` и `herald hook`
 - [ ] Task: Самосброс — `SelfReset` (хуки, `--delay`, срок, notify)
 - [ ] Task: CLI — `herald self`, запуск фоном
