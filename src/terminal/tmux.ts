@@ -1,8 +1,8 @@
 import type { Terminal } from './terminal.ts';
 
 type Env = Record<string, string | undefined>;
-/** Запуск `tmux` с аргументами; ненулевой код — исключение. */
-type TmuxRun = (args: string[]) => Promise<void>;
+/** Запуск `tmux` с аргументами → stdout; ненулевой код — исключение. */
+export type TmuxRun = (args: string[]) => Promise<string | undefined>;
 
 /**
  * Терминал окна агента в tmux: текст набирается в панель так, будто его ввёл человек.
@@ -35,12 +35,23 @@ export class TmuxTerminal implements Terminal {
     await this.tmux(['send-keys', '-t', this.pane, 'Enter']);
   }
 
-  static async run(args: string[]): Promise<void> {
-    const proc = Bun.spawn(['tmux', ...args], { stdout: 'ignore', stderr: 'pipe' });
-    const code = await proc.exited;
+  /** Текст, видимый в панели. */
+  async screen(): Promise<string> {
+    return (await this.tmux(['capture-pane', '-p', '-t', this.pane])) ?? '';
+  }
+
+  /** Нажать клавиши tmux (`Down`, `Enter`…) — без очистки поля ввода. */
+  async press(...keys: string[]): Promise<void> {
+    await this.tmux(['send-keys', '-t', this.pane, ...keys]);
+  }
+
+  static async run(args: string[]): Promise<string> {
+    const proc = Bun.spawn(['tmux', ...args], { stdout: 'pipe', stderr: 'pipe' });
+    const [code, stdout] = await Promise.all([proc.exited, new Response(proc.stdout).text()]);
     if (code !== 0) {
       const stderr = (await new Response(proc.stderr).text()).trim();
       throw new Error(`tmux ${args[0]}: ${stderr || `код ${code}`}`);
     }
+    return stdout;
   }
 }

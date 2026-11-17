@@ -34,6 +34,27 @@ describe('TmuxTerminal', () => {
     expect(new TmuxTerminal('%7').pane).toBe('%7');
   });
 
+  test('экран панели — capture-pane, текст как есть', async () => {
+    const calls: string[][] = [];
+    const terminal = new TmuxTerminal('%20', async (args) => {
+      calls.push(args);
+      return 'строка 1\nстрока 2\n';
+    });
+    expect(await terminal.screen()).toBe('строка 1\nстрока 2\n');
+    expect(calls).toEqual([['capture-pane', '-p', '-t', '%20']]);
+  });
+
+  test('клавиши — как есть, без очистки поля ввода', async () => {
+    const calls: string[][] = [];
+    const terminal = new TmuxTerminal('%20', async (args) => void calls.push(args));
+    await terminal.press('Down', 'Enter');
+    expect(calls).toEqual([['send-keys', '-t', '%20', 'Down', 'Enter']]);
+  });
+
+  test('tmux run возвращает stdout', async () => {
+    expect(await TmuxTerminal.run(['-V'])).toMatch(/^tmux /);
+  });
+
   test('tmux завершился с ошибкой — исключение с его stderr', async () => {
     const terminal = new TmuxTerminal('%999', TmuxTerminal.run);
     await expect(terminal.send('/clear')).rejects.toThrow(/tmux/);
