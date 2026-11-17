@@ -26,7 +26,7 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: `bun run check` зелёный; требования 8–10 покрыты тестами и документами; локальная проверка демона против локального сервера.
 
-- [ ] Task: Клиент — `hostPoll`, `hostDone`
+- [~] Task: Клиент — `hostPoll`, `hostDone`
 - [ ] Task: CLI — демон `herald host`
 - [ ] Task: Канал — `/exit` без статуса после команды
 - [ ] Task: Документы — `docs/model.md` (CLI, канал), `docs/install.md` (unit `systemd --user`, linger)
@@ -50,5 +50,6 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - Подсказки: `Messages.UNKNOWN_COMMAND` и «Выбери адресата… (/clear, /compact)» — с `/exit`; список команд — с `/new`, `/cancel` (тесты `human.test.ts` ~396, 416, 512 правятся под новый текст).
 - pi: `/exit` не трогаем — расширение уже отвечает «⚠️ /exit не выполнена: pi не знает этой команды».
 - Демон (`herald host`): `AgentLauncher` с `cwd = home`, сессия tmux `agents`, таймаут 60 с; итог ok — `pane`, `window`, `dir`; ошибка — `LaunchError.message` (там хвост экрана).
+- Фаза 2 готова: `/v1/host/poll` `{ waitMs? }` → `{ launches: LaunchWire[] }` (`{ id, dir, prompt, createdAt }`, тип — `src/http/wire.ts`); `/v1/host/done` `{ id, ok, text }` → `{ ok: true }`; повтор итога — 400, чужой — 403, сбой Telegram — 502 (итог уже сохранён: демону не повторять, а логировать). Сервер урезает `waitMs` до `HERALD_MAX_WAIT_SECONDS`.
 - Отчёт `purge` теперь с `hosts`, `launches`, `dialogs` — отразить в `docs/model.md`, «Хранение».
 - Цикл задачи удобно делать скриптом (если не стёрт): `/tmp/claude-1000/-home-nur-dev-tools-herald/6db7a092-b82b-4e88-bbc6-23f0c75a0d17/scratchpad/done.sh "<коммит>" "<note>" "<уникальный фрагмент задачи>" "<фрагмент следующей>"` — коммит, git note, отметка в плане, коммит плана.
