@@ -26,8 +26,8 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 
 Критерии фазы: `bun run check` зелёный; требования 8–10 покрыты тестами и документами; локальная проверка демона против локального сервера.
 
-- [~] Task: Клиент — `hostPoll`, `hostDone`
-- [ ] Task: CLI — демон `herald host`
+- [x] Task: Клиент — `hostPoll`, `hostDone` (dab8e9d)
+- [~] Task: CLI — демон `herald host`
 - [ ] Task: Канал — `/exit` без статуса после команды
 - [ ] Task: Документы — `docs/model.md` (CLI, канал), `docs/install.md` (unit `systemd --user`, linger)
 - [ ] Task: Conductor - User Manual Verification 'Фаза 3: Демон и канал' (Protocol in workflow.md)
