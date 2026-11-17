@@ -1,0 +1,7 @@
+Фаза 4 «Выкатка и живая проверка».
+Область: git diff 1ba8872..HEAD — только plan.md (кода нет).
+Автотесты: CI=true bun test — 551 pass, 0 fail.
+Выкатка: push 1119143 после ask q_5xvd6kxuf0 (A: push + выкатка); scripts/deploy.sh — /health ok, схема v7 (hosts, launches, dialogs), error-лог пуст.
+Служба: ~/.config/systemd/user/herald-host.service по docs/install.md — active, «машина nur-asus… жду запусков».
+Живая проверка (Нурболат в Telegram, ask q_2sesmld7cm: A — всё сработало): /new → nur-asus → /home/nur/herald-livetest → задача «hello.txt + reply готово»; демон: l_6ergg8lmq4 → окно @32 %44 за ~1 с; hello.txt = ok; /sessions — сессия видна; /exit — окно @32 закрыто. ~/herald-livetest удалён.
+Ручная верификация — по Автопилоту и подтверждению Нурболата (q_2sesmld7cm).
