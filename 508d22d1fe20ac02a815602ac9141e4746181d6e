@@ -1,0 +1,1 @@
+Задача: CLI. herald self <команда> [--message] [--timeout] [--delay] [--foreground]: проверка (команда с /, одна строка, TMUX_PANE), запуск себя фоном через DetachedProcess (setsid -f, лог $XDG_STATE_HOME/herald/self/<панель>.log), --foreground — SelfReset в процессе. Уведомление — herald notify сессии. Файлы: src/cli/{cli,terminal,main}.ts и тесты, src/infra/system.ts.
