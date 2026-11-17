@@ -1,0 +1,1 @@
+Проверка Фазы 2: bun run check зелёный; хуки Stop и SessionStart(clear|compact) в ~/.claude/settings.json; живая проверка в отдельном окне Claude Code 2.1.326 в tmux — /clear и /compact с --message, длинное и многострочное сообщения.
