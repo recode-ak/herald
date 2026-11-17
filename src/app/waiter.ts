@@ -2,7 +2,8 @@ import type { Clock } from './ports.ts';
 
 /**
  * Ожидание событий в памяти процесса сервера: long poll HTTP ждёт темы, сценарии человека их будят.
- * Темы: `q:<id вопроса>` — вопрос получил ответ, `s:<ключ сессии>` — новое входящее.
+ * Темы: `q:<id вопроса>` — вопрос получил ответ, `s:<ключ сессии>` — новое входящее,
+ * `h:<человек>:<машина>` — новый запуск окна для демона машины.
  * Событие не хранится: ждущий сначала проверяет хранилище, потом ждёт (без `await` между ними).
  */
 export class Waiter {
@@ -16,6 +17,10 @@ export class Waiter {
 
   static sessionTopic(sessionKey: string): string {
     return `s:${sessionKey}`;
+  }
+
+  static hostTopic(person: string, host: string): string {
+    return `h:${person}:${host}`;
   }
 
   /** `true` — пришло событие темы, `false` — истёк таймаут. */

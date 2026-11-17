@@ -1,3 +1,4 @@
+import type { Launch } from '../domain/host.ts';
 import type { Question, QuestionItem, Resolution } from '../domain/question.ts';
 import type { Session } from '../domain/session.ts';
 import { Markup } from './markup.ts';
@@ -265,6 +266,15 @@ export class Messages {
 
   static sessionButton(session: Session): string {
     return `${session.label} · ${session.host}`;
+  }
+
+  /** Итог запуска окна по `/new` — reply на сообщение с задачей; `text` — окно или ошибка с хвостом экрана. */
+  static launchOutcome(launch: Launch): string {
+    const outcome = launch.outcome;
+    if (!outcome) throw new Error(`у запуска ${launch.id} нет итога`);
+    return outcome.ok
+      ? `🪟 Окно открыто на ${launch.host}: ${outcome.text}`
+      : `⚠️ Окно не открылось на ${launch.host}: ${outcome.text}`;
   }
 
   static readonly NO_SESSIONS = 'Сессий на связи нет.';
