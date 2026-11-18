@@ -382,23 +382,28 @@ describe('Сообщение без адресата', () => {
     return { k, menu, origin, button };
   }
 
-  test('одна сессия на связи — текст сразу её указанием, без меню', async () => {
+  test('одна сессия на связи — тоже меню: текст уходит только после выбора', async () => {
     const k = setup();
     await k.agent.notify(nur, 'x');
     await k.say(NUR_CHAT, 'как дела?');
+    const menu = k.telegram.last(NUR_CHAT)!;
+    expect(menu).toMatchObject({ text: 'Кому?', replyTo: 1001 });
+    expect(menu.buttons!.map((row) => row.map((b) => b.text))).toEqual([['u7-school · laptop'], ['✖ Отмена']]);
+    expect(await k.agent.inbox(nur)).toEqual([]);
+
+    await k.press(NUR_CHAT, menu.messageId, menu.buttons![0]![0]!.data, { messageId: 1001, text: 'как дела?' });
     expect((await k.agent.inbox(nur)).map((i) => [i.kind, i.text])).toEqual([['directive', 'как дела?']]);
-    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(1);
     expect(k.telegram.reaction(NUR_CHAT, 1001)).toBe('✍');
   });
 
-  test('закрытая сессия не в счёт: на связи одна — ей сразу', async () => {
+  test('закрытая сессия в меню не попадает', async () => {
     const k = setup();
     await k.agent.notify(ops, 'y');
     await k.agent.bye(ops);
     await k.agent.notify(nur, 'x');
     await k.say(NUR_CHAT, 'как дела?');
-    expect((await k.agent.inbox(nur)).map((i) => i.text)).toEqual(['как дела?']);
-    expect(await k.agent.inbox(ops)).toEqual([]);
+    const menu = k.telegram.last(NUR_CHAT)!;
+    expect(menu.buttons!.map((row) => row.map((b) => b.text))).toEqual([['u7-school · laptop'], ['✖ Отмена']]);
   });
 
   test('сессий на связи нет — «Сессий на связи нет.», во входящие ничего', async () => {
@@ -622,7 +627,7 @@ describe('Команды терминала', () => {
     expect(k.store.question(q.id)?.status).toBe('open');
   });
 
-  test('команда без адресата — меню «Кому <команда>?» даже при одной сессии; кнопка — команда ей', async () => {
+  test('команда без адресата — меню «Кому <команда>?»; кнопка — команда ей', async () => {
     const k = setup();
     await k.agent.notify(nur, 'x');
     await k.say(NUR_CHAT, '/compact@herald_bot');

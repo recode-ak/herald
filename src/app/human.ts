@@ -111,7 +111,7 @@ export class HumanService {
     if (dialog) return this.newWindow.input(dialog, update.text, update);
 
     const target = this.deps.store.chatTarget(update.chatId);
-    if (!target) return this.unaddressed(person, text, update, command);
+    if (!target) return this.unaddressed(person, update, command);
     this.deps.store.setChatTarget(update.chatId, undefined);
     return command
       ? this.post(person, target, 'command', command, update)
@@ -119,20 +119,13 @@ export class HumanService {
   }
 
   /**
-   * Сообщение без адресата. Текст: одной сессии на связи — сразу указанием; нескольким — меню «Кому?» reply
-   * на сообщение. Команда терминала — меню всегда: нажатие подтверждает её. Сообщение нигде не хранится:
-   * по кнопке меню оно приходит с нажатием (`origin`).
+   * Сообщение без адресата (текст или команда терминала) — меню «Кому?» reply на него, даже при одной сессии
+   * на связи: само оно никому не уходит. Сообщение нигде не хранится: по кнопке меню оно приходит с нажатием
+   * (`origin`).
    */
-  private async unaddressed(
-    person: PersonId,
-    text: string,
-    update: MessageUpdate,
-    command?: string,
-  ): Promise<string | undefined> {
+  private async unaddressed(person: PersonId, update: MessageUpdate, command?: string): Promise<string | undefined> {
     const sessions = this.onlineSessions(person);
-    const [only] = sessions;
-    if (!only) return Messages.NO_SESSIONS;
-    if (sessions.length === 1 && !command) return this.post(person, only.key, 'directive', text, update);
+    if (sessions.length === 0) return Messages.NO_SESSIONS;
     await this.deps.telegram.send({
       chatId: update.chatId,
       text: Messages.whomMenu(command),
