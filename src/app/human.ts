@@ -111,7 +111,7 @@ export class HumanService {
     if (dialog) return this.newWindow.input(dialog, update.text, update);
 
     const target = this.deps.store.chatTarget(update.chatId);
-    if (!target) return command ? Messages.WHOM : this.unaddressed(person, text, update);
+    if (!target) return this.unaddressed(person, text, update, command);
     this.deps.store.setChatTarget(update.chatId, undefined);
     return command
       ? this.post(person, target, 'command', command, update)
@@ -119,17 +119,23 @@ export class HumanService {
   }
 
   /**
-   * Текст без адресата: одной сессии на связи — сразу указанием; нескольким — меню «Кому?» reply на сообщение.
-   * Текст нигде не хранится: по кнопке меню он приходит с нажатием (`origin`).
+   * Сообщение без адресата. Текст: одной сессии на связи — сразу указанием; нескольким — меню «Кому?» reply
+   * на сообщение. Команда терминала — меню всегда: нажатие подтверждает её. Сообщение нигде не хранится:
+   * по кнопке меню оно приходит с нажатием (`origin`).
    */
-  private async unaddressed(person: PersonId, text: string, update: MessageUpdate): Promise<string | undefined> {
+  private async unaddressed(
+    person: PersonId,
+    text: string,
+    update: MessageUpdate,
+    command?: string,
+  ): Promise<string | undefined> {
     const sessions = this.onlineSessions(person);
     const [only] = sessions;
     if (!only) return Messages.NO_SESSIONS;
-    if (sessions.length === 1) return this.post(person, only.key, 'directive', text, update);
+    if (sessions.length === 1 && !command) return this.post(person, only.key, 'directive', text, update);
     await this.deps.telegram.send({
       chatId: update.chatId,
-      text: Messages.WHOM_MENU,
+      text: Messages.whomMenu(command),
       replyTo: update.messageId,
       buttons: [
         ...sessions.map((s) => [{ text: Messages.sessionButton(s), data: `m:s:${HumanService.sessionToken(s)}` }]),
@@ -151,10 +157,12 @@ export class HumanService {
     if (!session) throw new ForbiddenError('сессия недоступна');
     // Доставленное сообщение уже связано со своим входящим: старая кнопка второго не создаст.
     if (this.deps.store.link(update.chatId, origin.messageId)) return Messages.ALREADY_SENT;
-    await this.post(person, session.key, 'directive', origin.text.trim(), {
-      chatId: update.chatId,
-      messageId: origin.messageId,
-    });
+    const text = origin.text.trim();
+    const command = HumanService.commandOf(text);
+    // Исходное сообщение отредактировано в неизвестную команду — не указание.
+    if (command && !InboxItem.isCommand(command)) return Messages.STALE_BUTTON;
+    const message = { chatId: update.chatId, messageId: origin.messageId };
+    await this.post(person, session.key, command ? 'command' : 'directive', command ?? text, message);
     await this.notices.closeMenu(update.chatId, update.messageId, Messages.addressed(session));
     return `Адресат: ${session.project}`;
   }

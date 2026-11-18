@@ -317,9 +317,13 @@ export class Messages {
   static readonly NO_SESSIONS = 'Сессий на связи нет.';
   static readonly UNKNOWN_COMMAND =
     'Неизвестная команда. Есть: /new, /sessions, /status, /cancel, /clear, /compact, /exit.';
-  static readonly WHOM = 'Кому? Ответь reply на сообщение сессии или выбери адресата в /sessions.';
-  /** Меню текста без адресата (сессий на связи несколько): reply на сообщение человека с кнопками сессий. */
-  static readonly WHOM_MENU = 'Кому?';
+  /** Reply на сообщение, не связанное с сессией. */
+  static readonly WHOM = 'Кому? Это сообщение не связано с сессией: напиши без reply или выбери адресата в /sessions.';
+  /** Меню сообщения без адресата — reply на него с кнопками сессий; у команды терминала — с её именем. */
+  static whomMenu(command?: string): string {
+    return command ? `Кому ${command}?` : 'Кому?';
+  }
+
   static readonly WHOM_CANCELLED = 'Отменено.';
   static readonly CANCEL_BUTTON = '✖ Отмена';
   /** Старая кнопка меню «Кому?»: сообщение уже ушло сессии. */

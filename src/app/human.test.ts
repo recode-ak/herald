@@ -622,12 +622,38 @@ describe('Команды терминала', () => {
     expect(k.store.question(q.id)?.status).toBe('open');
   });
 
-  test('команда без адресата — «Кому?»', async () => {
+  test('команда без адресата — меню «Кому <команда>?» даже при одной сессии; кнопка — команда ей', async () => {
     const k = setup();
     await k.agent.notify(nur, 'x');
-    await k.say(NUR_CHAT, '/compact');
+    await k.say(NUR_CHAT, '/compact@herald_bot');
+    const menu = k.telegram.last(NUR_CHAT)!;
+    expect(menu).toMatchObject({ text: 'Кому /compact?', replyTo: 1001 });
+    expect(menu.buttons!.map((row) => row.map((b) => b.text))).toEqual([['u7-school · laptop'], ['✖ Отмена']]);
     expect(await k.agent.inbox(nur)).toEqual([]);
-    expect(k.telegram.last(NUR_CHAT)?.text).toStartWith('Кому?');
+
+    await k.press(NUR_CHAT, menu.messageId, menu.buttons![0]![0]!.data, {
+      messageId: 1001,
+      text: '/compact@herald_bot',
+    });
+    expect((await k.agent.inbox(nur)).map((i) => [i.kind, i.text])).toEqual([['command', '/compact']]);
+    expect(k.telegram.reaction(NUR_CHAT, 1001)).toBe('✍');
+    expect(k.telegram.message(NUR_CHAT, menu.messageId)?.text).toBe('→ u7-school · laptop');
+  });
+
+  test('команда без адресата и без сессий на связи — «Сессий на связи нет.»', async () => {
+    const k = setup();
+    await k.say(NUR_CHAT, '/exit');
+    expect(k.telegram.last(NUR_CHAT)?.text).toBe('Сессий на связи нет.');
+  });
+
+  test('меню «Кому?»: исходное сообщение стало неизвестной командой — «кнопка устарела»', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    await k.say(NUR_CHAT, '/clear');
+    const menu = k.telegram.last(NUR_CHAT)!;
+    await k.press(NUR_CHAT, menu.messageId, menu.buttons![0]![0]!.data, { messageId: 1001, text: '/model opus' });
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('⚠️ кнопка устарела');
+    expect(await k.agent.inbox(nur)).toEqual([]);
   });
 
   test('неизвестная команда — список команд, выбранный адресат сохраняется', async () => {
