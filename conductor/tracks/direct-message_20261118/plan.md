@@ -9,8 +9,8 @@ Spec — [spec.md](./spec.md). Процесс — [workflow.md](../../workflow.m
 - [x] Task: Telegram — у нажатия кнопки исходное сообщение (`reply_to_message`): порт `TelegramUpdate`, `src/infra/telegram.ts` (e002b50)
 - [x] Task: Бот — текст без адресата: одна сессия — сразу, несколько — меню «Кому?», выбор, отмена, повторное нажатие (тесты «без адресата — подсказка» в `human.test.ts` и `new-window.test.ts` правятся под новое поведение) (9ea85ca)
 - [x] Task: Бот — команды терминала без адресата — меню «Кому <команда>?» всегда (тест «команда без адресата — „Кому?“» правится) (1ecfc09)
-- [~] Task: Документы — `docs/model.md` (бот, входящие)
-- [ ] Task: Conductor - User Manual Verification 'Фаза 1: Бот и документы' (Protocol in workflow.md)
+- [x] Task: Документы — `docs/model.md` (бот, входящие) (ec94a0d)
+- [~] Task: Conductor - User Manual Verification 'Фаза 1: Бот и документы' (Protocol in workflow.md)
 
 ## Фаза 2: Выкатка и живая проверка
 
