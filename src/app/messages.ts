@@ -301,7 +301,7 @@ export class Messages {
     const label = dialog.step === 'host' ? (c: string) => c : Messages.dirLabel;
     return [
       ...dialog.choices.map((c, i) => [{ text: label(c), data: `n:${dialog.token}:${kind}:${i}` }]),
-      [{ text: '✖ Отмена', data: `n:${dialog.token}:x` }],
+      [{ text: Messages.CANCEL_BUTTON, data: `n:${dialog.token}:x` }],
     ];
   }
 
@@ -318,6 +318,18 @@ export class Messages {
   static readonly UNKNOWN_COMMAND =
     'Неизвестная команда. Есть: /new, /sessions, /status, /cancel, /clear, /compact, /exit.';
   static readonly WHOM = 'Кому? Ответь reply на сообщение сессии или выбери адресата в /sessions.';
+  /** Меню текста без адресата (сессий на связи несколько): reply на сообщение человека с кнопками сессий. */
+  static readonly WHOM_MENU = 'Кому?';
+  static readonly WHOM_CANCELLED = 'Отменено.';
+  static readonly CANCEL_BUTTON = '✖ Отмена';
+  /** Старая кнопка меню «Кому?»: сообщение уже ушло сессии. */
+  static readonly ALREADY_SENT = 'Уже отправлено';
+
+  /** Итог меню «Кому?» вместо его текста. */
+  static addressed(session: Session): string {
+    return `→ ${Messages.sessionButton(session)}`;
+  }
+
   /** Кнопка вопроса, которого больше нет: удалён очисткой по сроку хранения. */
   static readonly QUESTION_GONE = '⚠️ вопрос устарел и удалён';
 

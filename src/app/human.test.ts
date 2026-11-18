@@ -26,8 +26,17 @@ function setup() {
     agent: new AgentService(kit),
     human,
     /** Нажатие кнопки на сообщении. */
-    press: (chatId: number, messageId: number, data: string) =>
-      human.handle({ kind: 'callback', updateId: ++updateId, callbackId: `cb${updateId}`, chatId, messageId, data }),
+    /** Нажатие кнопки на сообщении; `origin` — сообщение, на которое оно отвечает reply. */
+    press: (chatId: number, messageId: number, data: string, origin?: { messageId: number; text: string }) =>
+      human.handle({
+        kind: 'callback',
+        updateId: ++updateId,
+        callbackId: `cb${updateId}`,
+        chatId,
+        messageId,
+        data,
+        ...(origin && { origin }),
+      }),
     /** Текст человека; `replyTo` — reply на сообщение. */
     say: (chatId: number, text: string, replyTo?: number) => {
       const update: TelegramUpdate = {
@@ -352,18 +361,140 @@ describe('Указания', () => {
     expect(k.telegram.last(NUR_CHAT)?.text).toStartWith('Кому?');
   });
 
-  test('текст без reply и без адресата — подсказка, во входящие не попадает', async () => {
-    const k = setup();
-    await k.agent.notify(nur, 'x');
-    await k.say(NUR_CHAT, 'привет');
-    expect(await k.agent.inbox(nur)).toEqual([]);
-    expect(k.telegram.last(NUR_CHAT)?.text).toStartWith('Кому?');
-  });
-
   test('reply на сообщение, не связанное с сессией, — подсказка', async () => {
     const k = setup();
     await k.say(NUR_CHAT, 'что это', 999);
     expect(k.telegram.last(NUR_CHAT)?.text).toStartWith('Кому?');
+  });
+});
+
+describe('Сообщение без адресата', () => {
+  /** Две сессии на связи: `ops` свежее, в меню первая. */
+  async function two() {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    k.clock.advance(1000);
+    await k.agent.notify(ops, 'y');
+    await k.say(NUR_CHAT, 'как дела?');
+    const menu = k.telegram.last(NUR_CHAT)!;
+    const origin = { messageId: 1001, text: 'как дела?' };
+    const button = (text: string) => menu.buttons!.flat().find((b) => b.text.includes(text))!.data;
+    return { k, menu, origin, button };
+  }
+
+  test('одна сессия на связи — текст сразу её указанием, без меню', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    await k.say(NUR_CHAT, 'как дела?');
+    expect((await k.agent.inbox(nur)).map((i) => [i.kind, i.text])).toEqual([['directive', 'как дела?']]);
+    expect(k.telegram.sentTo(NUR_CHAT)).toHaveLength(1);
+    expect(k.telegram.reaction(NUR_CHAT, 1001)).toBe('✍');
+  });
+
+  test('закрытая сессия не в счёт: на связи одна — ей сразу', async () => {
+    const k = setup();
+    await k.agent.notify(ops, 'y');
+    await k.agent.bye(ops);
+    await k.agent.notify(nur, 'x');
+    await k.say(NUR_CHAT, 'как дела?');
+    expect((await k.agent.inbox(nur)).map((i) => i.text)).toEqual(['как дела?']);
+    expect(await k.agent.inbox(ops)).toEqual([]);
+  });
+
+  test('сессий на связи нет — «Сессий на связи нет.», во входящие ничего', async () => {
+    const k = setup();
+    await k.agent.notify(nur, 'x');
+    await k.agent.bye(nur);
+    await k.say(NUR_CHAT, 'как дела?');
+    expect(k.telegram.last(NUR_CHAT)).toMatchObject({ text: 'Сессий на связи нет.', replyTo: 1001 });
+    expect(await k.agent.inbox(nur)).toEqual([]);
+  });
+
+  test('несколько сессий — меню «Кому?» reply на сообщение: кнопки сессий и «✖ Отмена»; во входящих пусто', async () => {
+    const { k, menu } = await two();
+    expect(menu).toMatchObject({ text: 'Кому?', replyTo: 1001 });
+    expect(menu.buttons!.map((row) => row.map((b) => b.text))).toEqual([
+      ['chronicle · server'],
+      ['u7-school · laptop'],
+      ['✖ Отмена'],
+    ]);
+    for (const b of menu.buttons!.flat()) expect(Buffer.byteLength(b.data)).toBeLessThanOrEqual(64);
+    expect(await k.agent.inbox(nur)).toEqual([]);
+    expect(await k.agent.inbox(ops)).toEqual([]);
+  });
+
+  test('кнопка сессии → исходное сообщение — её указание; реакция на нём, меню закрыто', async () => {
+    const { k, menu, origin, button } = await two();
+    await k.press(NUR_CHAT, menu.messageId, button('chronicle'), origin);
+
+    expect((await k.agent.inbox(ops)).map((i) => [i.kind, i.text])).toEqual([['directive', 'как дела?']]);
+    expect(await k.agent.inbox(nur)).toEqual([]);
+    expect(k.telegram.reaction(NUR_CHAT, 1001)).toBe('✍');
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('Адресат: chronicle');
+    const closed = k.telegram.message(NUR_CHAT, menu.messageId)!;
+    expect(closed.text).toBe('→ chronicle · server');
+    expect(closed.buttons).toBeUndefined();
+
+    // reply на доставленное сообщение — указание той же сессии.
+    await k.say(NUR_CHAT, 'и тесты?', 1001);
+    expect((await k.agent.inbox(ops)).map((i) => i.text)).toEqual(['как дела?', 'и тесты?']);
+  });
+
+  test('повторное нажатие после доставки — «Уже отправлено», второго входящего нет', async () => {
+    const { k, menu, origin, button } = await two();
+    await k.press(NUR_CHAT, menu.messageId, button('chronicle'), origin);
+    await k.press(NUR_CHAT, menu.messageId, button('u7-school'), origin);
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('Уже отправлено');
+    expect(await k.agent.inbox(ops)).toHaveLength(1);
+    expect(await k.agent.inbox(nur)).toEqual([]);
+  });
+
+  test('«✖ Отмена» — меню закрыто, во входящие ничего', async () => {
+    const { k, menu, origin, button } = await two();
+    await k.press(NUR_CHAT, menu.messageId, button('Отмена'), origin);
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('Отменено');
+    const closed = k.telegram.message(NUR_CHAT, menu.messageId)!;
+    expect(closed.text).toBe('Отменено.');
+    expect(closed.buttons).toBeUndefined();
+    expect(await k.agent.inbox(nur)).toEqual([]);
+    expect(await k.agent.inbox(ops)).toEqual([]);
+  });
+
+  test('нажатие без исходного сообщения — «кнопка устарела»', async () => {
+    const { k, menu, button } = await two();
+    await k.press(NUR_CHAT, menu.messageId, button('chronicle'));
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('⚠️ кнопка устарела');
+    expect(await k.agent.inbox(ops)).toEqual([]);
+  });
+
+  test('сбой Telegram при закрытии меню доставку не отменяет', async () => {
+    const { k, menu, origin, button } = await two();
+    // Реакция уходит первой, правка меню — второй; падает правка.
+    const react = k.telegram.react.bind(k.telegram);
+    k.telegram.react = async (...args) => {
+      await react(...args);
+      k.telegram.failNext();
+    };
+    await k.press(NUR_CHAT, menu.messageId, button('chronicle'), origin);
+    expect(await k.agent.inbox(ops)).toHaveLength(1);
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toBe('Адресат: chronicle');
+  });
+
+  test('кнопка чужой сессии — отказ', async () => {
+    const { k, menu, button } = await two();
+    await k.press(ANN_CHAT, menu.messageId, button('chronicle'), { messageId: 5, text: 'стоп' });
+    expect(k.telegram.callbackAnswers.at(-1)?.text).toStartWith('⛔');
+    expect(await k.agent.inbox(ops)).toEqual([]);
+  });
+
+  test('сессия ушла со связи до выбора — доставка с предупреждением', async () => {
+    const { k, menu, origin, button } = await two();
+    await k.agent.bye(ops);
+    await k.press(NUR_CHAT, menu.messageId, button('chronicle'), origin);
+    expect(k.telegram.last(NUR_CHAT)).toMatchObject({
+      text: '⚠️ chronicle не на связи (закрыта только что) — прочтёт, когда подключится.',
+      replyTo: 1001,
+    });
   });
 });
 
@@ -474,9 +605,7 @@ describe('Команды терминала', () => {
     await k.say(NUR_CHAT, '/clear');
     expect((await k.agent.inbox(nur)).map((i) => [i.kind, i.text])).toEqual([['command', '/clear']]);
     expect(k.telegram.reaction(NUR_CHAT, 1003)).toBe('✍');
-
-    await k.say(NUR_CHAT, 'ещё');
-    expect(k.telegram.last(NUR_CHAT)?.text).toStartWith('Кому?');
+    expect(k.store.chatTarget(NUR_CHAT)).toBeUndefined();
   });
 
   test('reply на сообщение сессии (и на её вопрос) — команда этой сессии, не ответ', async () => {

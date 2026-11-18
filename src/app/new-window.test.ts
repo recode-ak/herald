@@ -232,7 +232,7 @@ describe('/new — шаги', () => {
     await k.say('/new');
     k.clock.advance(NewWindowDialog.TTL_MS + 1);
     await k.say('dev/x');
-    expect(last(k).text).toStartWith('Кому?');
+    expect(last(k).text).toBe('Сессий на связи нет.');
     expect(k.store.dialog(NUR_CHAT)).toBeUndefined();
   });
 });

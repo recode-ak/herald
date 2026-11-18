@@ -24,10 +24,15 @@ export interface HumanDeps {
 
 type MessageUpdate = Extract<TelegramUpdate, { kind: 'message' }>;
 type CallbackUpdate = Extract<TelegramUpdate, { kind: 'callback' }>;
+/** Сообщение человека в чате: на нём реакция-квитанция, на него — reply бота. */
+interface ChatMessage {
+  chatId: number;
+  messageId: number;
+}
 
 /**
- * Сценарии человека — разбор апдейтов Telegram: кнопки вопросов, reply, `/sessions`, `/status`,
- * команды терминала сессии (`/clear`, `/compact`, `/exit`), диалог нового окна (`/new`, `/cancel`).
+ * Сценарии человека — разбор апдейтов Telegram: кнопки вопросов, reply, текст без адресата (меню «Кому?»),
+ * `/sessions`, `/status`, команды терминала сессии (`/clear`, `/compact`, `/exit`), диалог нового окна (`/new`, `/cancel`).
  * Принимаются только апдейты chat_id из доступа и только по сессиям своего человека.
  */
 export class HumanService {
@@ -74,6 +79,7 @@ export class HumanService {
     if (kind === 'h' && id && rest.length === 0) return this.hold(person, id);
     if (kind === 't' && id && rest.length === 0) return this.toTerminal(person, id);
     if (kind === 's' && id && rest.length === 0) return this.select(person, update.chatId, id);
+    if (kind === 'm') return this.address(person, [id ?? '', ...rest], update);
     if (kind === 'n') return this.newWindow.press([id ?? '', ...rest], update);
     return Messages.STALE_BUTTON;
   }
@@ -81,7 +87,7 @@ export class HumanService {
   /** Сообщение человека; возвращает ответ бота (или ничего). */
   private async onMessage(person: PersonId, update: MessageUpdate): Promise<string | undefined> {
     const text = update.text.trim();
-    const command = text.startsWith('/') ? text.split(/\s/, 1)[0]?.split('@', 1)[0] : undefined;
+    const command = HumanService.commandOf(text);
     if (command === '/new') return this.newWindow.start(person, update.chatId);
     if (command === '/cancel') return this.newWindow.cancel(update.chatId);
     // Другая команда прерывает диалог `/new` и выполняется как обычно.
@@ -105,11 +111,52 @@ export class HumanService {
     if (dialog) return this.newWindow.input(dialog, update.text, update);
 
     const target = this.deps.store.chatTarget(update.chatId);
-    if (!target) return Messages.WHOM;
+    if (!target) return command ? Messages.WHOM : this.unaddressed(person, text, update);
     this.deps.store.setChatTarget(update.chatId, undefined);
     return command
       ? this.post(person, target, 'command', command, update)
       : this.post(person, target, 'directive', text, update);
+  }
+
+  /**
+   * Текст без адресата: одной сессии на связи — сразу указанием; нескольким — меню «Кому?» reply на сообщение.
+   * Текст нигде не хранится: по кнопке меню он приходит с нажатием (`origin`).
+   */
+  private async unaddressed(person: PersonId, text: string, update: MessageUpdate): Promise<string | undefined> {
+    const sessions = this.onlineSessions(person);
+    const [only] = sessions;
+    if (!only) return Messages.NO_SESSIONS;
+    if (sessions.length === 1) return this.post(person, only.key, 'directive', text, update);
+    await this.deps.telegram.send({
+      chatId: update.chatId,
+      text: Messages.WHOM_MENU,
+      replyTo: update.messageId,
+      buttons: [
+        ...sessions.map((s) => [{ text: Messages.sessionButton(s), data: `m:s:${HumanService.sessionToken(s)}` }]),
+        [{ text: Messages.CANCEL_BUTTON, data: 'm:x' }],
+      ],
+    });
+    return undefined;
+  }
+
+  /** Кнопка меню «Кому?»: `s:<сессия>` — исходное сообщение уходит ей, как ушло бы reply; `x` — никому. */
+  private async address(person: PersonId, [action, token]: string[], update: CallbackUpdate): Promise<string> {
+    if (action === 'x') {
+      await this.notices.closeMenu(update.chatId, update.messageId, Messages.WHOM_CANCELLED);
+      return 'Отменено';
+    }
+    const origin = update.origin;
+    if (action !== 's' || !token || !origin) return Messages.STALE_BUTTON;
+    const session = this.deps.store.sessionsOf(person).find((s) => HumanService.sessionToken(s) === token);
+    if (!session) throw new ForbiddenError('сессия недоступна');
+    // Доставленное сообщение уже связано со своим входящим: старая кнопка второго не создаст.
+    if (this.deps.store.link(update.chatId, origin.messageId)) return Messages.ALREADY_SENT;
+    await this.post(person, session.key, 'directive', origin.text.trim(), {
+      chatId: update.chatId,
+      messageId: origin.messageId,
+    });
+    await this.notices.closeMenu(update.chatId, update.messageId, Messages.addressed(session));
+    return `Адресат: ${session.project}`;
   }
 
   /**
@@ -256,7 +303,7 @@ export class HumanService {
     sessionKey: string,
     kind: Extract<InboxKind, 'directive' | 'command'>,
     text: string,
-    update: MessageUpdate,
+    message: ChatMessage,
   ): Promise<undefined> {
     const session = this.ownSession(person, sessionKey);
     const item = InboxItem.create(
@@ -264,9 +311,9 @@ export class HumanService {
       this.deps.clock.now(),
     );
     this.deps.store.saveInboxItem(item);
-    await this.notices.queued(item, session, update.chatId, update.messageId);
+    await this.notices.queued(item, session, message.chatId, message.messageId);
     const warning = Messages.offline(session, this.deps.clock.now());
-    if (warning) await this.notices.warn(warning, update.chatId, update.messageId);
+    if (warning) await this.notices.warn(warning, message.chatId, message.messageId);
     this.deps.waiter.notify(Waiter.sessionTopic(sessionKey));
     return undefined;
   }
@@ -313,6 +360,11 @@ export class HumanService {
     if (!session) throw new NotFoundError(`сессии ${sessionKey} нет`);
     if (session.person !== person) throw new ForbiddenError('сессия недоступна');
     return session;
+  }
+
+  /** `/команда` в начале текста (без `@бота` и аргументов). */
+  private static commandOf(text: string): string | undefined {
+    return text.startsWith('/') ? text.split(/\s/, 1)[0]?.split('@', 1)[0] : undefined;
   }
 
   /** Короткий id сессии для callback_data (ключ может быть длиннее 64 байт). */

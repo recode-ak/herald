@@ -94,6 +94,11 @@ export class Notices {
     });
   }
 
+  /** Закрыть меню: итог вместо текста, кнопки убраны. */
+  async closeMenu(chatId: number, messageId: number, text: string): Promise<void> {
+    await this.bestEffort(() => this.telegram.edit(chatId, messageId, text));
+  }
+
   /** Реакция на сообщениях входящего → «прочитано». */
   async read(item: InboxItem): Promise<void> {
     for (const link of this.store.linksOfInbox(item.id)) {
