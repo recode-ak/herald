@@ -1,0 +1,8 @@
+Контрольная точка Фазы 1 «Бот и документы» трека direct-message (Автопилот: ручная проверка считается пройденной).
+
+Автотесты: CI=true bun run check — biome, tsc, 564 pass / 0 fail. Покрытие: human.ts 100/99.6, notices.ts 100, messages.ts 100, infra/telegram.ts 93.8/99.1.
+Файлы фазы с тестами: src/app/telegram.ts и src/infra/telegram.ts (telegram.test.ts — origin нажатия), src/app/human.ts, notices.ts, messages.ts (human.test.ts — «Сообщение без адресата», «Команды терминала»; new-window.test.ts).
+
+Решение без ответа: команды без адресата — меню всегда (вариант A вопроса q_93i4416jgu, по таймауту).
+
+План ручной проверки для Ф2 (вживую, после выкатки): одна сессия на связи — текст без reply доходит сразу (реакция ✍); две — меню «Кому?», выбор → «→ <сессия>», «✖ Отмена» → «Отменено.»; /compact без адресата — меню «Кому /compact?». Главное, что проверяется вживую: Telegram присылает reply_to_message в callback_query.message.
