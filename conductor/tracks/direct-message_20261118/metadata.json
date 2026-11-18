@@ -1,0 +1,8 @@
+{
+  "track_id": "direct-message_20261118",
+  "type": "feature",
+  "status": "in_progress",
+  "created_at": "2026-11-18T07:21:37Z",
+  "updated_at": "2026-11-18T07:21:37Z",
+  "description": "Сообщение без адресата: одной сессии — сразу, нескольким — выбор «Кому?» с отменой"
+}
