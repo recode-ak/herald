@@ -53,4 +53,6 @@ export type TelegramUpdate =
       chatId: number;
       messageId: number;
       data: string;
+      /** Исходное сообщение: на него сообщение с кнопкой отвечает reply (меню «Кому?»). */
+      origin?: { messageId: number; text: string };
     };

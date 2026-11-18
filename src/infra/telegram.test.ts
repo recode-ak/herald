@@ -178,6 +178,38 @@ describe('TelegramBotApi.getUpdates', () => {
     });
   });
 
+  test('нажатие кнопки на сообщении-reply несёт исходное сообщение; без текста — не несёт', async () => {
+    const { fake, api } = setup();
+    fake.pushUpdate({
+      callback_query: {
+        id: 'cb1',
+        data: 'm:x',
+        message: { message_id: 6, chat: { id: 111 }, reply_to_message: { message_id: 5, text: 'как дела?' } },
+      },
+    });
+    fake.pushUpdate({
+      callback_query: {
+        id: 'cb2',
+        data: 'm:x',
+        message: { message_id: 8, chat: { id: 111 }, reply_to_message: { message_id: 7 } },
+      },
+    });
+
+    const batch = await api.getUpdates(0, 0);
+    expect(batch.updates).toEqual([
+      {
+        kind: 'callback',
+        updateId: 1,
+        callbackId: 'cb1',
+        chatId: 111,
+        messageId: 6,
+        data: 'm:x',
+        origin: { messageId: 5, text: 'как дела?' },
+      },
+      { kind: 'callback', updateId: 2, callbackId: 'cb2', chatId: 111, messageId: 8, data: 'm:x' },
+    ]);
+  });
+
   test('offset подтверждает прочитанные; пусто — nextOffset прежний', async () => {
     const { fake, api } = setup();
     fake.pushUpdate({ message: { message_id: 1, chat: { id: 111 }, text: 'a' } });

@@ -36,7 +36,7 @@ interface RawMessage {
   message_id: number;
   chat: { id: number };
   text?: string;
-  reply_to_message?: { message_id: number };
+  reply_to_message?: { message_id: number; text?: string };
 }
 
 interface RawUpdate {
@@ -188,6 +188,7 @@ export class TelegramBotApi implements TelegramPort {
     }
     const cb = u.callback_query;
     if (cb?.data !== undefined && cb.message) {
+      const origin = cb.message.reply_to_message;
       return {
         kind: 'callback',
         updateId: u.update_id,
@@ -195,6 +196,7 @@ export class TelegramBotApi implements TelegramPort {
         chatId: cb.message.chat.id,
         messageId: cb.message.message_id,
         data: cb.data,
+        ...(origin?.text !== undefined && { origin: { messageId: origin.message_id, text: origin.text } }),
       };
     }
     return undefined;
