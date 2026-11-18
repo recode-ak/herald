@@ -1,0 +1,4 @@
+Задача: Telegram — у нажатия кнопки исходное сообщение.
+Апдейт callback получил origin { messageId, text } — сообщение, на которое отвечает сообщение с кнопкой (callback_query.message.reply_to_message). Без текста — поля нет.
+Файлы: src/app/telegram.ts, src/infra/telegram.ts, src/infra/telegram.test.ts.
+Зачем: меню «Кому?» не хранит ожидающий текст в БД — его несёт нажатие.
